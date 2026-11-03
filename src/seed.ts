@@ -366,7 +366,7 @@ async function run(): Promise<void> {
 
 async function seedEverything(payload: Payload): Promise<void> {
   // Очистка
-  for (const slug of ['products', 'categories', 'media']) {
+  for (const slug of ['products', 'categories', 'media'] as const) {
     const { docs } = await payload.find({
       collection: slug,
       limit: 1000,
@@ -442,7 +442,7 @@ async function seedEverything(payload: Payload): Promise<void> {
       },
     })
 
-    const category = categoryIds[p.category]
+    const category = categoryIds[p.category] as number
     await payload.create({
       collection: 'products',
       data: {
@@ -453,6 +453,7 @@ async function seedEverything(payload: Payload): Promise<void> {
         summary: p.summary,
         description: {
           root: {
+            type: 'root',
             children: p.description.map((text) => ({
               type: 'paragraph',
               version: 1,
