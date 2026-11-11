@@ -22,12 +22,28 @@ export default async function HomePage() {
     }),
   ])
 
+  // Если featured-товаров мало — добираем свежими, исключая уже выбранные (иначе дубликаты и повторные key)
   const latest =
     featured.docs.length >= 4
       ? []
-      : await payload.find({ collection: 'products', depth: 1, sort: '-createdAt', limit: 8 })
+      : (
+          await payload.find({
+            collection: 'products',
+            depth: 1,
+            sort: '-createdAt',
+            limit: 8,
+            where: { id: { not_in: featured.docs.map((p) => p.id) } },
+          })
+        ).docs
 
-  const products = [...featured.docs, ...(Array.isArray(latest) ? [] : latest.docs)].slice(0, 8)
+  const seen = new Set<string | number>()
+  const products = [...featured.docs, ...latest]
+    .filter((p) => {
+      if (seen.has(p.id)) return false
+      seen.add(p.id)
+      return true
+    })
+    .slice(0, 8)
 
   return (
     <>

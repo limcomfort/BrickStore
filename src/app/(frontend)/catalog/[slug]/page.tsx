@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { getBrickPayload, getSettings } from '@/lib/data'
-import { formatPrice, discountPercent, isMediaPopulated } from '@/lib/media'
+import { formatPrice, discountPercent, isMediaPopulated, toTelHref } from '@/lib/media'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category, Media, Product } from '@/payload-types'
 
@@ -54,7 +54,7 @@ export default async function ProductPage({ params }: { params: Params }) {
   })
 
   const discount = discountPercent(product.price, product.oldPrice)
-  const phone = settings?.contactPhone?.replace(/[^+\d]/g, '') || ''
+  const telHref = toTelHref(settings?.contactPhone || '')
   const mailto = `mailto:${settings?.contactEmail || ''}?subject=${encodeURIComponent(
     `Вопрос по набору «${product.title}» (арт. ${product.article})`,
   )}`
@@ -131,8 +131,8 @@ export default async function ProductPage({ params }: { params: Params }) {
             </div>
 
             <div className="buy-actions">
-              {phone ? (
-                <a className="btn btn-red btn-lg" href={`tel:${phone}`}>
+              {settings?.contactPhone ? (
+                <a className="btn btn-red btn-lg" href={telHref}>
                   Заказать по телефону
                 </a>
               ) : (

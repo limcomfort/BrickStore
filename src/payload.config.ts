@@ -14,6 +14,16 @@ import { Settings } from './globals/Settings'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
+// Пустой секрет делает сессии Payload предсказуемыми — падаем сразу, а не в проде
+function resolveSecret(): string {
+  const secret = process.env.PAYLOAD_SECRET
+  if (secret) return secret
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('PAYLOAD_SECRET не задан. Добавьте его в переменные окружения.')
+  }
+  return 'dev-only-secret-do-not-use-in-production'
+}
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -27,7 +37,7 @@ export default buildConfig({
   collections: [Products, Categories, Media, Users],
   globals: [Settings],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || '',
+  secret: resolveSecret(),
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },

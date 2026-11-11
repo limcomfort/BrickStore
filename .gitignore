@@ -51,10 +51,3 @@ next-env.d.ts
 *.db-journal
 
 # generated import map is kept in git only as a fallback is generated before dev/build
-
-# Playwright
-node_modules/
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/

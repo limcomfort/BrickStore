@@ -1,5 +1,6 @@
 import { BrickLogo } from '@/components/BrickLogo'
 import Link from 'next/link'
+import { toTelHref } from '@/lib/media'
 import type { Setting } from '@/payload-types'
 
 export function Header({ settings }: { settings: Setting | null }) {
@@ -26,7 +27,7 @@ export function Header({ settings }: { settings: Setting | null }) {
 
           <div className="header-actions">
             {settings?.contactPhone && (
-              <a className="header-phone" href={`tel:${settings.contactPhone.replace(/[^+\d]/g, '')}`}>
+              <a className="header-phone" href={toTelHref(settings.contactPhone)}>
                 {settings.contactPhone}
               </a>
             )}

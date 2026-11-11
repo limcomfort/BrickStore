@@ -1,5 +1,6 @@
 import { BrickLogo } from '@/components/BrickLogo'
 import Link from 'next/link'
+import { toTelHref } from '@/lib/media'
 import type { Category, Setting } from '@/payload-types'
 
 export function Footer({
@@ -42,7 +43,7 @@ export function Footer({
         <div className="footer-col">
           <h4>Контакты</h4>
           {settings?.contactPhone && (
-            <a href={`tel:${settings.contactPhone.replace(/[^+\d]/g, '')}`}>{settings.contactPhone}</a>
+            <a href={toTelHref(settings.contactPhone)}>{settings.contactPhone}</a>
           )}
           {settings?.contactEmail && <a href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>}
           <span>Ежедневно с 10:00 до 21:00</span>

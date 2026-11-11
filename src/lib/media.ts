@@ -9,7 +9,14 @@ export function formatPrice(value: number): string {
 }
 
 export function isMediaPopulated(image: unknown): image is Media {
-  return Boolean(image && typeof image === 'object' && 'url' in image)
+  return Boolean(
+    image && typeof image === 'object' && 'url' in image && typeof (image as Media).url === 'string',
+  )
+}
+
+/** Из строки телефона делает значение для href: `tel:` — только цифры и ведущий «+». */
+export function toTelHref(phone: string): string {
+  return `tel:${phone.replace(/[^+\d]/g, '')}`
 }
 
 export function discountPercent(price: number, oldPrice?: number | null): number | null {

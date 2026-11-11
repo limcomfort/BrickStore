@@ -8,6 +8,8 @@ const dirname = path.dirname(__filename)
 
 const nextConfig: NextConfig = {
   images: {
+    // SVG разрешён для сгенерированных иллюстраций из сида (загрузка — только админ).
+    // При появлении пользовательских загрузок опцию нужно убрать: SVG может содержать скрипты (XSS).
     dangerouslyAllowSVG: true,
     contentDispositionType: 'inline',
     localPatterns: [

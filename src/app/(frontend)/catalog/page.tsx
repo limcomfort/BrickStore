@@ -52,11 +52,13 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
           ? '-createdAt'
           : '-featured'
 
-  const page = Math.max(1, Number(params.page) || 1)
+  const page = Math.max(1, Number.parseInt(params.page ?? '', 10) || 1)
+
+  const query = params.q?.trim() ?? ''
 
   const where: Where = {}
   if (activeCategory) where.category = { equals: activeCategory.id }
-  if (params.q) where.title = { like: params.q }
+  if (query) where.title = { like: query }
 
   const { docs, totalDocs, totalPages, page: currentPage = 1 } = await payload.find({
     collection: 'products',
@@ -110,7 +112,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         <form className="search" action="/catalog" method="get">
           {activeCategory && <input type="hidden" name="category" value={activeCategory.slug} />}
           {params.sort && <input type="hidden" name="sort" value={params.sort} />}
-          <input type="search" name="q" placeholder="Найти набор…" defaultValue={params.q || ''} aria-label="Поиск по каталогу" />
+          <input type="search" name="q" placeholder="Найти набор…" defaultValue={query} aria-label="Поиск по каталогу" />
           <button type="submit" className="btn btn-sm btn-dark">
             Найти
           </button>
