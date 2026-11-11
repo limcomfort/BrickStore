@@ -1,14 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import type { Where } from 'payload'
 import { getBrickPayload, getCategories } from '@/lib/data'
+import { matchesQuery } from '@/lib/search'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category } from '@/payload-types'
-
-export const metadata: Metadata = {
-  title: 'Каталог наборов LEGO — BrickStore',
-  description: 'Все наборы LEGO в наличии: фильтры по темам, поиск и сортировка по цене.',
-}
 
 type SearchParams = {
   category?: string
@@ -23,6 +20,37 @@ const SORTS: { value: string; label: string }[] = [
   { value: 'price-asc', label: 'Сначала дешёвые' },
   { value: 'price-desc', label: 'Сначала дорогие' },
 ]
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const query = params.q?.trim()
+  const categories = await getCategories()
+  const category = categories.find((c: Category) => c.slug === params.category)
+
+  if (query) {
+    return {
+      title: `Поиск: «${query}» — BrickStore`,
+      description: `Результаты поиска «${query}» по каталогу наборов LEGO.`,
+      robots: { index: false, follow: true },
+    }
+  }
+
+  if (category) {
+    return {
+      title: `${category.title} — каталог LEGO — BrickStore`,
+      description: category.description || `Наборы LEGO серии ${category.title} в BrickStore.`,
+    }
+  }
+
+  return {
+    title: 'Каталог наборов LEGO — BrickStore',
+    description: 'Все наборы LEGO в наличии: фильтры по темам, поиск и сортировка по цене.',
+  }
+}
 
 function buildUrl(params: SearchParams, patch: Partial<SearchParams>): string {
   const search = new URLSearchParams()
@@ -56,18 +84,39 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
 
   const query = params.q?.trim() ?? ''
 
+  const hasQuery = query.length > 0
+
   const where: Where = {}
   if (activeCategory) where.category = { equals: activeCategory.id }
-  if (query) where.title = { like: query }
 
   const { docs, totalDocs, totalPages, page: currentPage = 1 } = await payload.find({
     collection: 'products',
     depth: 1,
     where,
     sort,
-    limit: 9,
-    page,
+    limit: hasQuery ? 200 : 9,
+    page: hasQuery ? 1 : page,
   })
+
+  // Поиск выполняется в памяти: `like` в SQLite регистрозависим для кириллицы и не ищет
+  // по подстроке, поэтому фильтруем сами и игнорируем `%`/`_` как спецсимволы.
+  const matched = hasQuery
+    ? docs.filter((product) => {
+        const category = product.category as { title?: string } | null
+        return (
+          matchesQuery(product.title, query) ||
+          matchesQuery(product.summary, query) ||
+          matchesQuery(category?.title, query)
+        )
+      })
+    : docs
+
+  const effectiveTotal = hasQuery ? matched.length : totalDocs
+  const effectivePages = hasQuery ? 1 : totalPages
+  const effectivePage = hasQuery ? 1 : currentPage
+
+  // Страница за пределами диапазона при корректном номере страницы — это 404, а не «ничего не найдено»
+  if (!hasQuery && totalDocs > 0 && page > totalPages) notFound()
 
   return (
     <div className="wrap page">
@@ -90,7 +139,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             {activeCategory?.description || 'Выберите тему и соберите свою коллекцию LEGO.'}
           </p>
         </div>
-        <small className="result-count">Найдено: {totalDocs}</small>
+        <small className="result-count">Найдено: {effectiveTotal}</small>
       </div>
 
       <div className="toolbar">
@@ -132,35 +181,42 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
         ))}
       </div>
 
-      {docs.length > 0 ? (
-        <div className="product-grid">
-          {docs.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+      {matched.length > 0 ? (
+        <>
+          <h2 className="visually-hidden">Результаты каталога</h2>
+          <div className="product-grid">
+            {matched.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </>
       ) : (
         <div className="empty-state">
           <span className="empty-brick" aria-hidden="true">🧱</span>
           <h2>Ничего не нашлось</h2>
-          <p>Попробуйте изменить запрос или выбрать другую тему.</p>
+          <p>
+            {hasQuery
+              ? `По запросу «${query}» товаров нет. Проверьте написание или выберите другую тему.`
+              : 'В этой теме пока нет товаров. Загляните позже или сбросьте фильтры.'}
+          </p>
           <Link className="btn btn-red" href="/catalog">
             Сбросить фильтры
           </Link>
         </div>
       )}
 
-      {totalPages > 1 && (
+      {effectivePages > 1 && (
         <nav className="pager" aria-label="Страницы каталога">
-          {currentPage > 1 && (
-            <Link className="btn btn-sm btn-outline" href={buildUrl(params, { page: String(currentPage - 1) })}>
+          {effectivePage > 1 && (
+            <Link className="btn btn-sm btn-outline" href={buildUrl(params, { page: String(effectivePage - 1) })}>
               ← Назад
             </Link>
           )}
           <span className="muted">
-            Страница {currentPage} из {totalPages}
+            Страница {effectivePage} из {effectivePages}
           </span>
-          {currentPage < totalPages && (
-            <Link className="btn btn-sm btn-outline" href={buildUrl(params, { page: String(currentPage + 1) })}>
+          {effectivePage < effectivePages && (
+            <Link className="btn btn-sm btn-outline" href={buildUrl(params, { page: String(effectivePage + 1) })}>
               Вперёд →
             </Link>
           )}

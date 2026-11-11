@@ -1,12 +1,13 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { formatPrice, discountPercent, isMediaPopulated } from '@/lib/media'
+import { formatPrice, discountPercent, hasDiscount, isMediaPopulated } from '@/lib/media'
 import type { Product } from '@/payload-types'
 
 export function ProductCard({ product }: { product: Product }) {
   const category = product.category as { title?: string; slug?: string } | null
   const image = product.heroImage
   const discount = discountPercent(product.price, product.oldPrice)
+  const showOldPrice = hasDiscount(product.price, product.oldPrice)
 
   return (
     <article className="product-card">
@@ -38,7 +39,7 @@ export function ProductCard({ product }: { product: Product }) {
         <div className="product-footer">
           <div className="price-block">
             <span className="price">{formatPrice(product.price)}</span>
-            {product.oldPrice ? <s className="old-price">{formatPrice(product.oldPrice)}</s> : null}
+            {showOldPrice ? <s className="old-price">{formatPrice(product.oldPrice!)}</s> : null}
           </div>
           <Link className="btn btn-sm btn-outline" href={`/catalog/${product.slug}`}>
             Подробнее

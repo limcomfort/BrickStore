@@ -69,6 +69,15 @@ export const Products: CollectionConfig = {
       label: 'Цена до скидки, ₽',
       admin: {
         condition: (_data, siblingData) => Boolean(siblingData?.price),
+        description: 'Должна быть больше текущей цены',
+      },
+      validate: (value: number | null | undefined, { siblingData }: { siblingData: Record<string, unknown> }) => {
+        if (value === null || value === undefined || value === 0) return true
+        const price = Number(siblingData?.price)
+        if (!Number.isNaN(price) && price > 0 && value <= price) {
+          return 'Цена до скидки должна быть больше текущей цены'
+        }
+        return true
       },
     },
     {

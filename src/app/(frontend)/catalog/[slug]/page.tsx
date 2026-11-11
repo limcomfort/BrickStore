@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { getBrickPayload, getSettings } from '@/lib/data'
-import { formatPrice, discountPercent, isMediaPopulated, toTelHref } from '@/lib/media'
+import { formatPrice, discountPercent, hasDiscount, isMediaPopulated, toTelHref } from '@/lib/media'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category, Media, Product } from '@/payload-types'
 
@@ -41,7 +41,11 @@ export default async function ProductPage({ params }: { params: Params }) {
 
   const category = product.category as Category | null
   const hero = product.heroImage as Media | number
-  const gallery = (product.gallery || []).filter(isMediaPopulated)
+  // Главное изображение уже показано крупно — в миниатюрах оставляем только остальные ракурсы
+  const heroId = typeof hero === 'object' && hero ? hero.id : hero
+  const gallery = (product.gallery || [])
+    .filter(isMediaPopulated)
+    .filter((image) => image.id !== heroId)
 
   const related = await payload.find({
     collection: 'products',
@@ -93,7 +97,7 @@ export default async function ProductPage({ params }: { params: Params }) {
             {discount ? <span className="badge badge-red badge-lg">−{discount}%</span> : null}
           </div>
 
-          {gallery.length > 1 && (
+          {gallery.length > 0 && (
             <div className="gallery-thumbs">
               {gallery.map((image) =>
                 image.url ? (
@@ -127,7 +131,7 @@ export default async function ProductPage({ params }: { params: Params }) {
           <div className="buy-box">
             <div className="price-block price-lg">
               <span className="price">{formatPrice(product.price)}</span>
-              {product.oldPrice ? <s className="old-price">{formatPrice(product.oldPrice)}</s> : null}
+              {hasDiscount(product.price, product.oldPrice) ? <s className="old-price">{formatPrice(product.oldPrice!)}</s> : null}
             </div>
 
             <div className="buy-actions">

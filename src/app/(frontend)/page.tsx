@@ -22,28 +22,9 @@ export default async function HomePage() {
     }),
   ])
 
-  // Если featured-товаров мало — добираем свежими, исключая уже выбранные (иначе дубликаты и повторные key)
-  const latest =
-    featured.docs.length >= 4
-      ? []
-      : (
-          await payload.find({
-            collection: 'products',
-            depth: 1,
-            sort: '-createdAt',
-            limit: 8,
-            where: { id: { not_in: featured.docs.map((p) => p.id) } },
-          })
-        ).docs
-
-  const seen = new Set<string | number>()
-  const products = [...featured.docs, ...latest]
-    .filter((p) => {
-      if (seen.has(p.id)) return false
-      seen.add(p.id)
-      return true
-    })
-    .slice(0, 8)
+  // В блоке «Хиты недели» — только товары с признаком `featured`, без «добора» обычными.
+  // Если хитов меньше четырёх, блок честно показывает меньше карточек.
+  const products = featured.docs.slice(0, 8)
 
   return (
     <>

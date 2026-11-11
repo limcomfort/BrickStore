@@ -20,6 +20,11 @@ export function toTelHref(phone: string): string {
 }
 
 export function discountPercent(price: number, oldPrice?: number | null): number | null {
-  if (!oldPrice || oldPrice <= price) return null
+  if (typeof oldPrice !== 'number' || oldPrice <= price) return null
   return Math.round((1 - price / oldPrice) * 100)
+}
+
+/** Есть ли у товара корректная «цена до скидки»: она должна быть больше текущей. */
+export function hasDiscount(price: number, oldPrice?: number | null): oldPrice is number {
+  return typeof oldPrice === 'number' && oldPrice > price
 }
