@@ -23,6 +23,13 @@ export const Products: CollectionConfig = {
       admin: {
         description: 'Используется в URL: /catalog/slug',
       },
+      validate: (value: string | null | undefined) => {
+        if (!value) return 'Slug обязателен'
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)) {
+          return 'Slug: только строчные латинские буквы, цифры и дефис (например, dream-home)'
+        }
+        return true
+      },
     },
     {
       name: 'article',

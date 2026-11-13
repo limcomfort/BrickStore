@@ -18,8 +18,9 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
     <html lang="ru">
       <body>
         <div className="site">
+          <a className="skip-link" href="#main">Перейти к содержимому</a>
           <Header settings={settings} />
-          <main className="site-main">{children}</main>
+          <main className="site-main" id="main" tabIndex={-1}>{children}</main>
           <Footer settings={settings} categories={categories} />
         </div>
       </body>

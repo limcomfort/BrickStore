@@ -37,6 +37,27 @@ html {
   border: 0;
 }
 
+/* Ссылка «Перейти к содержимому»: видна только при фокусе с клавиатуры */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 16px;
+  z-index: 100;
+  padding: 12px 20px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--dark);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus-visible {
+  top: 0;
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -755,6 +776,16 @@ section.section:last-of-type {
   color: var(--ink);
   font-weight: 700;
   border-bottom-color: var(--yellow);
+}
+
+.search-hint {
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border-left: 3px solid var(--yellow);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(255, 206, 0, 0.1);
+  font-size: 0.88rem;
+  color: var(--ink);
 }
 
 .empty-state {

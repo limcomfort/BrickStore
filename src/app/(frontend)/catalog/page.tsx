@@ -139,12 +139,20 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             {activeCategory?.description || 'Выберите тему и соберите свою коллекцию LEGO.'}
           </p>
         </div>
-        <small className="result-count">Найдено: {effectiveTotal}</small>
+        <small className="result-count">
+          {hasQuery
+            ? `Найдено: ${effectiveTotal}`
+            : `Найдено: ${effectiveTotal} · показано ${docs.length}`}
+        </small>
       </div>
 
       <div className="toolbar">
         <div className="chips" aria-label="Фильтр по теме">
-          <Link className={`chip ${!activeCategory ? 'is-active' : ''}`} href={buildUrl(params, { category: undefined, page: undefined })}>
+          <Link
+            className={`chip ${!activeCategory ? 'is-active' : ''}`}
+            href={buildUrl(params, { category: undefined, page: undefined })}
+            aria-current={!activeCategory ? 'page' : undefined}
+          >
             Все
           </Link>
           {categories.map((cat) => (
@@ -152,6 +160,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
               key={cat.id}
               className={`chip ${activeCategory?.id === cat.id ? 'is-active' : ''}`}
               href={buildUrl(params, { category: cat.slug, page: undefined })}
+              aria-current={activeCategory?.id === cat.id ? 'page' : undefined}
             >
               {cat.title}
             </Link>
@@ -175,6 +184,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
             key={item.value}
             className={`sort-link ${(params.sort || 'featured') === item.value ? 'is-active' : ''}`}
             href={buildUrl(params, { sort: item.value, page: undefined })}
+            aria-current={(params.sort || 'featured') === item.value ? 'true' : undefined}
           >
             {item.label}
           </Link>
@@ -184,6 +194,11 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
       {matched.length > 0 ? (
         <>
           <h2 className="visually-hidden">Результаты каталога</h2>
+          {hasQuery && (
+            <p className="search-hint">
+              Совпадения по названию, описанию и теме набора. Найдено по запросу «{query}»: {effectiveTotal}.
+            </p>
+          )}
           <div className="product-grid">
             {matched.map((product) => (
               <ProductCard key={product.id} product={product} />
