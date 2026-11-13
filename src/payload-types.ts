@@ -71,6 +71,7 @@ export interface Config {
     categories: Category;
     media: Media;
     users: User;
+    inquiries: Inquiry;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -82,6 +83,7 @@ export interface Config {
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    inquiries: InquiriesSelect<false> | InquiriesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -164,6 +166,9 @@ export interface Product {
    * Текущая цена, ₽
    */
   price: number;
+  /**
+   * Должна быть больше текущей цены
+   */
   oldPrice?: number | null;
   pieces?: number | null;
   ageMin?: number | null;
@@ -236,6 +241,22 @@ export interface User {
   collection: 'users';
 }
 /**
+ * Вопросы покупателей по конкретным наборам
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "inquiries".
+ */
+export interface Inquiry {
+  id: number;
+  name: string;
+  contact: string;
+  message: string;
+  product: number | Product;
+  status?: ('new' | 'in-progress' | 'answered') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
@@ -274,6 +295,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'users';
         value: number | User;
+      } | null)
+    | ({
+        relationTo: 'inquiries';
+        value: number | Inquiry;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -391,6 +416,19 @@ export interface UsersSelect<T extends boolean = true> {
         createdAt?: T;
         expiresAt?: T;
       };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "inquiries_select".
+ */
+export interface InquiriesSelect<T extends boolean = true> {
+  name?: T;
+  contact?: T;
+  message?: T;
+  product?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

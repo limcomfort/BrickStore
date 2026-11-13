@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { getBrickPayload, getSettings } from '@/lib/data'
 import { formatPrice, discountPercent, hasDiscount, isMediaPopulated, toTelHref } from '@/lib/media'
+import { AskQuestion } from '@/components/AskQuestion'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category, Media, Product } from '@/payload-types'
 
@@ -59,9 +60,6 @@ export default async function ProductPage({ params }: { params: Params }) {
 
   const discount = discountPercent(product.price, product.oldPrice)
   const telHref = toTelHref(settings?.contactPhone || '')
-  const mailto = `mailto:${settings?.contactEmail || ''}?subject=${encodeURIComponent(
-    `Вопрос по набору «${product.title}» (арт. ${product.article})`,
-  )}`
 
   return (
     <div className="wrap page">
@@ -144,9 +142,7 @@ export default async function ProductPage({ params }: { params: Params }) {
                   Перейти в каталог
                 </Link>
               )}
-              <a className="btn btn-outline btn-lg" href={mailto}>
-                Задать вопрос
-              </a>
+              <AskQuestion productId={product.id} productTitle={product.title} />
             </div>
 
             <ul className="buy-notes">
