@@ -1,4 +1,6 @@
 import type { CollectionConfig } from 'payload'
+import { SESSION_COOKIE } from './Customers'
+import { getCustomerByToken } from '@/lib/customer-session'
 
 /**
  * Заявки с формы «Задать вопрос» на странице товара.
@@ -58,6 +60,17 @@ export const Inquiries: CollectionConfig = {
       required: true,
     },
     {
+      // Необязательная связь: заявки гостей без кабинета остаются валидными
+      name: 'customer',
+      label: 'Покупатель',
+      type: 'relationship',
+      relationTo: 'customers',
+      index: true,
+      admin: {
+        position: 'sidebar',
+      },
+    },
+    {
       name: 'status',
       label: 'Статус',
       type: 'select',
@@ -72,4 +85,20 @@ export const Inquiries: CollectionConfig = {
       },
     },
   ],
+  hooks: {
+    /**
+     * Покупателя определяем на сервере по cookie-сессии.
+     * Клиент не может подставить чужой id: поле `customer` из входящих данных
+     * всегда перезаписывается результатом проверки сессии.
+     */
+    beforeChange: [
+      async ({ data, req }) => {
+        const token = req.headers
+          ?.get('cookie')
+          ?.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`))?.[1]
+        const session = await getCustomerByToken(req.payload, token)
+        return { ...data, customer: session?.id ?? null }
+      },
+    ],
+  },
 }

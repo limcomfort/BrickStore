@@ -1,4 +1,4 @@
-import { BrickLogo } from '@/components/BrickLogo'
+﻿import { BrickLogo } from '@/components/BrickLogo'
 import Link from 'next/link'
 import { toTelHref } from '@/lib/media'
 import type { Category, Setting } from '@/payload-types'
@@ -24,7 +24,7 @@ export function Footer({
         </div>
 
         <nav className="footer-col" aria-label="Каталог">
-          <h4>Каталог</h4>
+          <h2 className="footer-heading">Каталог</h2>
           {categories.slice(0, 6).map((cat) => (
             <Link key={cat.id} href={`/catalog?category=${cat.slug}`}>
               {cat.title}
@@ -34,14 +34,14 @@ export function Footer({
         </nav>
 
         <div className="footer-col">
-          <h4>Компания</h4>
+          <h2 className="footer-heading">Компания</h2>
           <span>Официальная гарантия 2 года</span>
           <span>Программа «Куб-лига» для постоянных покупателей</span>
           <span>Обмен и возврат 30 дней</span>
         </div>
 
         <div className="footer-col">
-          <h4>Контакты</h4>
+          <h2 className="footer-heading">Контакты</h2>
           {settings?.contactPhone && (
             <a href={toTelHref(settings.contactPhone)}>{settings.contactPhone}</a>
           )}

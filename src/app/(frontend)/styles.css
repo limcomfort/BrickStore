@@ -993,6 +993,255 @@ section.section:last-of-type {
   margin-bottom: 0;
 }
 
+/* ------------------------------------------------------- Избранное и кабинет */
+.account-nav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.account-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.92rem;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.account-link:hover .account-link-text {
+  text-decoration: underline;
+}
+
+.account-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--dark);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.account-count-empty {
+  background: var(--line);
+  color: var(--muted);
+}
+
+.account-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.favorite-btn span[aria-hidden='true'] {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.favorite-btn:hover:not(:disabled) {
+  border-color: var(--red);
+  color: var(--red-dark);
+}
+
+.favorite-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.favorite-btn-active {
+  border-color: rgba(227, 0, 11, 0.35);
+  background: rgba(227, 0, 11, 0.07);
+  color: var(--red-dark);
+}
+
+.favorite-btn:focus-visible {
+  outline: 2px solid var(--dark);
+  outline-offset: 2px;
+}
+
+.account-page {
+  padding-top: 28px;
+  padding-bottom: 60px;
+}
+
+.account-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.account-lead {
+  max-width: 62ch;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.account-guest {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 12px 0 40px;
+}
+
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+  padding: 26px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.account-form h2 {
+  margin-bottom: 4px;
+  font-size: 1.2rem;
+}
+
+.account-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.account-form input {
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 400;
+}
+
+.account-form input:focus-visible {
+  outline: none;
+  border-color: var(--dark);
+  box-shadow: 0 0 0 3px rgba(23, 22, 28, 0.12);
+}
+
+.account-block {
+  margin-bottom: 40px;
+}
+
+.account-block h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  font-size: 1.35rem;
+}
+
+.account-empty {
+  padding: 22px 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+}
+
+.account-empty a {
+  color: var(--red-dark);
+}
+
+.inquiry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inquiry-item {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.inquiry-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.inquiry-head a {
+  color: var(--ink);
+}
+
+.inquiry-status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.inquiry-status-new {
+  background: rgba(23, 22, 28, 0.08);
+  color: var(--muted);
+}
+
+.inquiry-status-in-progress {
+  background: rgba(240, 168, 0, 0.18);
+  color: #7a5200;
+}
+
+.inquiry-status-answered {
+  background: rgba(22, 140, 60, 0.14);
+  color: #0f6b2c;
+}
+
+.inquiry-message {
+  margin: 8px 0 6px;
+  color: var(--muted);
+}
+
+.inquiry-date {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 /* --------------------------------------------------------- Модалка заявки */
 .modal-backdrop {
   position: fixed;
@@ -1021,6 +1270,19 @@ section.section:last-of-type {
 .modal h2 {
   font-size: 1.5rem;
   margin-bottom: 4px;
+}
+
+.modal-known {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(23, 22, 28, 0.05);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.modal-known a {
+  color: var(--red-dark);
 }
 
 .modal-subtitle {
@@ -1189,7 +1451,8 @@ section.section:last-of-type {
   font-size: 0.9rem;
 }
 
-.footer-col h4 {
+.footer-col h4,
+.footer-col .footer-heading {
   margin-bottom: 4px;
   font-size: 0.78rem;
   font-weight: 700;

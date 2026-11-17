@@ -72,6 +72,8 @@ export interface Config {
     media: Media;
     users: User;
     inquiries: Inquiry;
+    customers: Customer;
+    favorites: Favorite;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -84,6 +86,8 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     inquiries: InquiriesSelect<false> | InquiriesSelect<true>;
+    customers: CustomersSelect<false> | CustomersSelect<true>;
+    favorites: FavoritesSelect<false> | FavoritesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -252,7 +256,37 @@ export interface Inquiry {
   contact: string;
   message: string;
   product: number | Product;
+  customer?: (number | null) | Customer;
   status?: ('new' | 'in-progress' | 'answered') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Аккаунты кабинета: избранное и история заявок
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers".
+ */
+export interface Customer {
+  id: number;
+  email: string;
+  name: string;
+  sessionToken?: string | null;
+  sessionExpiresAt?: string | null;
+  lastSeenAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Наборы, отложенные покупателями
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "favorites".
+ */
+export interface Favorite {
+  id: number;
+  customer: number | Customer;
+  product: number | Product;
   updatedAt: string;
   createdAt: string;
 }
@@ -299,6 +333,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'inquiries';
         value: number | Inquiry;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: number | Customer;
+      } | null)
+    | ({
+        relationTo: 'favorites';
+        value: number | Favorite;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -426,7 +468,31 @@ export interface InquiriesSelect<T extends boolean = true> {
   contact?: T;
   message?: T;
   product?: T;
+  customer?: T;
   status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers_select".
+ */
+export interface CustomersSelect<T extends boolean = true> {
+  email?: T;
+  name?: T;
+  sessionToken?: T;
+  sessionExpiresAt?: T;
+  lastSeenAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "favorites_select".
+ */
+export interface FavoritesSelect<T extends boolean = true> {
+  customer?: T;
+  product?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -1,13 +1,22 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { FavoriteButton } from '@/components/FavoriteButton'
 import { formatPrice, discountPercent, hasDiscount, isMediaPopulated } from '@/lib/media'
 import type { Product } from '@/payload-types'
 
-export function ProductCard({ product }: { product: Product }) {
+export function ProductCard({
+  product,
+  headingLevel = 3,
+}: {
+  product: Product
+  /** Уровень заголовка: в кабинете карточки вложены в блок `h2`. */
+  headingLevel?: 2 | 3
+}) {
   const category = product.category as { title?: string; slug?: string } | null
   const image = product.heroImage
   const discount = discountPercent(product.price, product.oldPrice)
   const showOldPrice = hasDiscount(product.price, product.oldPrice)
+  const Title = headingLevel === 2 ? 'h2' : 'h3'
 
   return (
     <article className="product-card">
@@ -27,9 +36,9 @@ export function ProductCard({ product }: { product: Product }) {
 
       <div className="product-body">
         <small className="product-cat">{category?.title}</small>
-        <h3 className="product-title">
+        <Title className="product-title">
           <Link href={`/catalog/${product.slug}`}>{product.title}</Link>
-        </h3>
+        </Title>
 
         <div className="product-meta">
           {product.pieces ? <span>🧩 {product.pieces} деталей</span> : null}
@@ -45,6 +54,8 @@ export function ProductCard({ product }: { product: Product }) {
             Подробнее
           </Link>
         </div>
+
+        <FavoriteButton productId={product.id} productTitle={product.title} />
       </div>
     </article>
   )

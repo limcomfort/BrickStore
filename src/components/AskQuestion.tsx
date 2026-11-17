@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState } from 'react'
+import { useFavorites } from '@/components/FavoritesProvider'
 
 type Props = {
   productId: number
@@ -20,6 +21,11 @@ export function AskQuestion({ productId, productTitle }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null)
   const firstFieldRef = useRef<HTMLInputElement>(null)
   const titleId = useId()
+  const { customer } = useFavorites()
+
+  // Покупателю из кабинета не нужно вводить имя и контакт
+  const knownName = customer?.name ?? ''
+  const knownContact = customer?.email ?? ''
 
   // Закрытие по Esc и возврат фокуса на кнопку
   useEffect(() => {
@@ -114,6 +120,14 @@ export function AskQuestion({ productId, productTitle }: Props) {
                 <p className="modal-subtitle">{productTitle}</p>
 
                 <form className="modal-form" onSubmit={handleSubmit} noValidate>
+                  {customer && (
+                    <p className="modal-known">
+                      Отвечаем вам, <strong>{customer.name}</strong> — на{' '}
+                      <strong>{customer.email}</strong>. Заявка появится в{' '}
+                      <a href="/account">личном кабинете</a>.
+                    </p>
+                  )}
+
                   <label>
                     <span>Как к вам обращаться</span>
                     <input
@@ -124,6 +138,7 @@ export function AskQuestion({ productId, productTitle }: Props) {
                       maxLength={80}
                       autoComplete="name"
                       placeholder="Иван"
+                      defaultValue={knownName}
                     />
                   </label>
 
@@ -136,6 +151,7 @@ export function AskQuestion({ productId, productTitle }: Props) {
                       maxLength={120}
                       autoComplete="tel"
                       placeholder="+7 900 000-00-00"
+                      defaultValue={knownContact}
                     />
                   </label>
 

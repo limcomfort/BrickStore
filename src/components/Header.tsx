@@ -1,3 +1,4 @@
+import { AccountNav } from '@/components/AccountNav'
 import { BrickLogo } from '@/components/BrickLogo'
 import Link from 'next/link'
 import { toTelHref } from '@/lib/media'
@@ -31,6 +32,7 @@ export function Header({ settings }: { settings: Setting | null }) {
                 {settings.contactPhone}
               </a>
             )}
+            <AccountNav />
             <Link className="btn btn-sm btn-red" href="/catalog">
               В каталог
             </Link>
