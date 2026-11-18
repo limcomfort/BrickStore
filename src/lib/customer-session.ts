@@ -30,6 +30,17 @@ type SessionCache = WeakMap<object, SessionCustomer | null>
 const readCache: SessionCache = new WeakMap()
 
 /**
+ * Токен из заголовка `Authorization: Bearer <token>`.
+ * Нужен мобильному клиенту, который не умеет работать с httpOnly-cookie.
+ */
+export function getTokenFromRequest(request: { headers?: Headers | null }): string | undefined {
+  const header = request.headers?.get('authorization')
+  if (!header) return undefined
+  const match = header.match(/^Bearer\s+(\S+)$/i)
+  return match?.[1]
+}
+
+/**
  * Находит покупателя по токену из cookie.
  * Возвращает null для гостя, истёкшей сессии и неизвестного токена.
  * В рамках одного запроса результат мемоизируется по объекту `payload`.
@@ -45,6 +56,19 @@ export async function getSessionCustomer(payload: Payload): Promise<SessionCusto
   const customer = await getCustomerByToken(payload, token)
   readCache.set(cacheKey, customer)
   return customer
+}
+
+/**
+ * Покупатель по запросу: сначала Bearer-токен (мобильное приложение),
+ * затем cookie (веб). Так один и тот же Route Handler обслуживает оба клиента.
+ */
+export async function getSessionCustomerFromRequest(
+  payload: Payload,
+  request: { headers?: Headers | null },
+): Promise<SessionCustomer | null> {
+  const bearerToken = getTokenFromRequest(request)
+  if (bearerToken) return getCustomerByToken(payload, bearerToken)
+  return getSessionCustomer(payload)
 }
 
 /** Проверяет, что сессия не истекла; отсутствие даты считаем истёкшей. */
@@ -104,6 +128,29 @@ export async function issueSession(
   store: CookieStore,
   options: IssueOptions = {},
 ): Promise<string> {
+  const token = await issueSessionToken(payload, customerId, options)
+
+  store.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: options.secure ?? false,
+    path: '/',
+    maxAge: Math.floor(SESSION_TTL_MS / 1000),
+  })
+
+  return token
+}
+
+/**
+ * Выдаёт сессию без установки cookie и возвращает сам токен.
+ * Для мобильного клиента: он присылает токен в `Authorization: Bearer`.
+ * В БД, как и для веба, лежит только SHA-256 от токена.
+ */
+export async function issueSessionToken(
+  payload: Payload,
+  customerId: number,
+  options: IssueOptions = {},
+): Promise<string> {
   const token = createSessionToken()
 
   await payload.update({
@@ -117,14 +164,6 @@ export async function issueSession(
     overrideAccess: true,
   })
 
-  store.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: options.secure ?? false,
-    path: '/',
-    maxAge: Math.floor(SESSION_TTL_MS / 1000),
-  })
-
   return token
 }
 
@@ -133,26 +172,29 @@ export async function clearSession(payload: Payload): Promise<void> {
   const store = await cookies()
   const token = store.get(SESSION_COOKIE)?.value
 
-  if (token) {
-    const found = await payload.find({
-      collection: 'customers',
-      where: { sessionToken: { equals: hashToken(token) } },
-      limit: 1,
-      depth: 0,
-      overrideAccess: true,
-    })
-    const customer = found.docs[0]
-    if (customer) {
-      await payload.update({
-        collection: 'customers',
-        id: customer.id,
-        data: { sessionToken: null, sessionExpiresAt: null },
-        overrideAccess: true,
-      })
-    }
-  }
+  if (token) await clearSessionByToken(payload, token)
 
   store.delete(SESSION_COOKIE)
+}
+
+/** Гасит сессию по конкретному токену — для Bearer-клиента, у которого нет cookie. */
+export async function clearSessionByToken(payload: Payload, token: string): Promise<void> {
+  const found = await payload.find({
+    collection: 'customers',
+    where: { sessionToken: { equals: hashToken(token) } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const customer = found.docs[0]
+  if (!customer) return
+
+  await payload.update({
+    collection: 'customers',
+    id: customer.id,
+    data: { sessionToken: null, sessionExpiresAt: null },
+    overrideAccess: true,
+  })
 }
 
 /** Нормализация входа: e-mail в нижний регистр, имя без двойных пробелов. */

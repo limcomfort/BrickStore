@@ -27,6 +27,22 @@ function resolveSecret(): string {
   return 'dev-only-secret-do-not-use-in-production'
 }
 
+// Список origin'ов для мобильного клиента и локальной разработки.
+// В проде задаётся через переменную окружения CORS_ORIGINS (через запятую).
+function resolveCors(): string[] {
+  const fromEnv = process.env.CORS_ORIGINS
+  if (fromEnv) {
+    return fromEnv
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('CORS_ORIGINS не задан. Перечислите разрешённые источники через запятую.')
+  }
+  return ['http://localhost:3000']
+}
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -37,6 +53,10 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
+  // Мобильное приложение шлёт запросы с другого origin (не с этого домена),
+  // поэтому Payload должен явно разрешить его заголовки и источники.
+  cors: resolveCors(),
+  csrf: resolveCors(),
   collections: [Products, Categories, Media, Users, Inquiries, Customers, Favorites],
   globals: [Settings],
   editor: lexicalEditor(),

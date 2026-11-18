@@ -1,6 +1,6 @@
-import config from '@payload-config'
+﻿import config from '@payload-config'
 import { getPayload } from 'payload'
-import { getSessionCustomer } from '@/lib/customer-session'
+import { getSessionCustomerFromRequest } from '@/lib/customer-session'
 import type { Product } from '@/payload-types'
 
 export const dynamic = 'force-dynamic'
@@ -24,7 +24,7 @@ function toId(value: number | { id: number } | null): number | null {
  */
 export async function GET(request: Request) {
   const payload = await getPayload({ config })
-  const customer = await getSessionCustomer(payload)
+  const customer = await getSessionCustomerFromRequest(payload, request)
   if (!customer) return json(UNAUTHORIZED, 401)
 
   const full = new URL(request.url).searchParams.get('format') === 'full'
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 /** Добавить товар. Повторное добавление не создаёт дубль. */
 export async function POST(request: Request) {
   const payload = await getPayload({ config })
-  const customer = await getSessionCustomer(payload)
+  const customer = await getSessionCustomerFromRequest(payload, request)
   if (!customer) return json(UNAUTHORIZED, 401)
 
   let body: unknown
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
 /** Убрать товар из избранного. Удаление отсутствующей записи — не ошибка. */
 export async function DELETE(request: Request) {
   const payload = await getPayload({ config })
-  const customer = await getSessionCustomer(payload)
+  const customer = await getSessionCustomerFromRequest(payload, request)
   if (!customer) return json(UNAUTHORIZED, 401)
 
   const productId = Number(new URL(request.url).searchParams.get('productId'))
