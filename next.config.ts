@@ -30,7 +30,9 @@ const SECURITY_HEADERS = [
       // `unsafe-eval` нужен только сборке разработчика.
       `script-src 'self' 'unsafe-inline'${DEV ? " 'unsafe-eval'" : ''}`,
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      // `https:` нужен админке Payload: аватары пользователей грузятся
+      // с gravatar.com. Для паблика это лишь источники картинок.
+      "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
       // WebSocket нужен для Fast Refresh в dev, в production остаётся только 'self'
       DEV ? "connect-src 'self' ws: http://localhost:*" : "connect-src 'self'",

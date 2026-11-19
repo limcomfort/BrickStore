@@ -25,20 +25,12 @@ export const Users: CollectionConfig = {
     lockTime: 10 * 60 * 1000,
   },
   access: {
-    // `read` нужен : самому пользователю для проверки сессии,
-    // остальное — только авторизованному админу
-    read: ({ req: { user } }) => {
-      if (!user) return false
-      // Свой профиль админ видит всегда, чужие — тоже (он администратор),
-      // но анонимный запрос не отдаёт ничего
-      return true
-    },
+    // Анониму не отдаём ничего: ни e-mail, ни сессии. HTTP-роут входа
+    // (`/api/users/login`) при этом работает — он обращается к коллекции
+    // через Local API, а не через REST-чтение.
+    read: ({ req: { user } }) => Boolean(user),
     create: ({ req: { user } }) => Boolean(user),
-    update: ({ req: { user } }) => {
-      if (!user) return false
-      // Удалять и менять чужие аккаунты может любой админ, свой — тоже
-      return true
-    },
+    update: ({ req: { user } }) => Boolean(user),
     delete: ({ req: { user } }) => Boolean(user),
   },
   fields: [
