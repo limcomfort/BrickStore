@@ -34,19 +34,23 @@ export function FavoriteButton({
       type="button"
       className={`favorite-btn${active ? ' favorite-btn-active' : ''}`}
       aria-pressed={active}
+      // Пока избранное грузится, кнопка занята: сообщаем это скринридеру
+      // и не даём нажать раньше, чем известно текущее состояние (BUG-08).
+      aria-busy={!ready || busy}
       aria-label={
-        active
-          ? `Убрать «${productTitle}» из избранного`
-          : `Добавить «${productTitle}» в избранное`
+        !ready
+          ? 'Загружаем избранное…'
+          : active
+            ? `Убрать «${productTitle}» из избранного`
+            : `Добавить «${productTitle}» в избранное`
       }
-      // До первичной загрузки кнопка неактивна: иначе гость нажмёт
-      // и получит отказ, хотя товар уже был в списке
+      title={!ready ? 'Избранное загружается…' : undefined}
       disabled={busy || !ready}
       onClick={handleClick}
     >
       <span aria-hidden="true">{active ? '♥' : '♡'}</span>
       <span className="favorite-btn-text">
-        {active ? 'В избранном' : 'В избранное'}
+        {!ready ? 'Загружаем…' : active ? 'В избранном' : 'В избранное'}
       </span>
     </button>
   )

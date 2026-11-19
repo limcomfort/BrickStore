@@ -23,6 +23,29 @@ type FavoritesContextValue = {
 
 const FavoritesContext = createContext<FavoritesContextValue | null>(null)
 
+/** Ключ в localStorage для синхронизации счётчика между вкладками. */
+const FAVORITES_SYNC_KEY = 'brickstore.favorites.rev'
+
+/** Сообщает другим вкладкам, что избранное изменилось. */
+function notifyOtherTabs(): void {
+  try {
+    localStorage.setItem(FAVORITES_SYNC_KEY, String(Date.now()))
+  } catch {
+    // Приватный режим без localStorage — синхронизация просто не сработает.
+  }
+}
+
+/** Ошибка API с HTTP-статусом: форме входа нужен 429, чтобы включить паузу. */
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message)
+    this.name = 'ApiRequestError'
+  }
+}
+
 type ApiError = { error?: string }
 
 async function readError(response: Response, fallback: string): Promise<string> {
@@ -71,6 +94,23 @@ export function FavoritesProvider({
     }
   }, [customer, loadFavorites])
 
+  // Другая вкладка изменила сессию или избранное — подтягиваем состояние,
+  // иначе счётчик в шапке расходится с базой (BUG-05).
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key === FAVORITES_SYNC_KEY && customer) void loadFavorites()
+    }
+    const onFocus = () => {
+      if (customer && document.visibilityState === 'visible') void loadFavorites()
+    }
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [customer, loadFavorites])
+
   const isFavorite = useCallback(
     (productId: number) => favorites.includes(productId),
     [favorites],
@@ -85,7 +125,10 @@ export function FavoritesProvider({
         body: JSON.stringify({ name, email }),
       })
       if (!response.ok) {
-        throw new Error(await readError(response, 'Не удалось выполнить вход'))
+        throw new ApiRequestError(
+          await readError(response, 'Не удалось выполнить вход'),
+          response.status,
+        )
       }
       const body = (await response.json()) as { customer: SessionCustomer }
       setCustomer(body.customer)
@@ -144,6 +187,7 @@ export function FavoritesProvider({
         setError(toggleError instanceof Error ? toggleError.message : 'Ошибка сети')
       } finally {
         setPending(null)
+        notifyOtherTabs()
       }
     },
     [customer, favorites],

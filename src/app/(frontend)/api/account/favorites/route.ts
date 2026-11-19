@@ -11,6 +11,9 @@ function json(body: unknown, status = 200) {
 
 const UNAUTHORIZED = { error: 'Требуется вход в кабинет' }
 
+/** Верхняя граница списка за один запрос — дальше отдаём пачками по `offset`. */
+const FAVORITES_LIMIT = 100
+
 /** Приводит relation-поле к числовому id (может прийти и объектом). */
 function toId(value: number | { id: number } | null): number | null {
   if (value === null || value === undefined) return null
@@ -21,35 +24,53 @@ function toId(value: number | { id: number } | null): number | null {
 /**
  * Избранное текущего покупателя.
  * `format=full` возвращает готовые карточки товаров — кабинет рисует их без второго запроса.
+ *
+ * Список строится по `productId`, который берётся из самого relation-поля.
+ * Раскрытие (`depth: 1`) используется только для карточек: раньше строка
+ * выбрасывалась целиком, если товар приходил числом, и избранное «пропадало».
  */
 export async function GET(request: Request) {
   const payload = await getPayload({ config })
   const customer = await getSessionCustomerFromRequest(payload, request)
   if (!customer) return json(UNAUTHORIZED, 401)
 
-  const full = new URL(request.url).searchParams.get('format') === 'full'
+  const searchParams = new URL(request.url).searchParams
+  const full = searchParams.get('format') === 'full'
+  const offset = Math.max(0, Number.parseInt(searchParams.get('offset') ?? '', 10) || 0)
 
   const found = await payload.find({
     collection: 'favorites',
     where: { customer: { equals: customer.id } },
-    limit: 100,
-    depth: 1,
+    limit: FAVORITES_LIMIT,
+    page: Math.floor(offset / FAVORITES_LIMIT) + 1,
+    depth: full ? 1 : 0,
     sort: '-createdAt',
     overrideAccess: true,
   })
 
   const rows = found.docs
-    .map((doc) => ({ favoriteId: doc.id, product: doc.product, productId: toId(doc.product) }))
-    .filter((row): row is { favoriteId: number; product: Product; productId: number } =>
-      typeof row.product === 'object' && row.product !== null && row.productId !== null,
-    )
+    .map((doc) => ({ product: doc.product, productId: toId(doc.product) }))
+    // Товар мог быть удалён из каталога — тогда связь придёт `null`.
+    // Такие записи в счётчик не попадают, но и остальные не ломают.
+    .filter((row): row is { product: Product; productId: number } => row.productId !== null)
 
-  if (!full) return json({ productIds: rows.map((row) => row.productId) })
+  const productIds = rows.map((row) => row.productId)
+  // Клиент видит, что список усечён, и может догрузить остальное (BUG-09).
+  const pagination = {
+    totalDocs: found.totalDocs,
+    totalPages: found.totalPages,
+    hasMore: found.hasNextPage,
+    nextOffset: found.hasNextPage ? offset + rows.length : null,
+  }
 
-  return json({
-    productIds: rows.map((row) => row.productId),
-    products: rows.map((row) => row.product),
-  })
+  if (!full) return json({ productIds, ...pagination })
+
+  // Товар мог не раскрыться (например, depth обрезан) — карточку подставляем только если она есть.
+  const products = rows
+    .map((row) => row.product)
+    .filter((product): product is Product => typeof product === 'object' && product !== null)
+
+  return json({ productIds, products, ...pagination })
 }
 
 /** Добавить товар. Повторное добавление не создаёт дубль. */

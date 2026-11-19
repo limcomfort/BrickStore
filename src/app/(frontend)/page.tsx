@@ -2,29 +2,37 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getBrickPayload, getCategories, getSettings } from '@/lib/data'
 import { ProductCard } from '@/components/ProductCard'
+import type { Product } from '@/payload-types'
 
 export const metadata: Metadata = {
   title: 'BrickStore — интернет-магазин конструкторов LEGO',
   description: 'Каталог наборов LEGO: Город, Техник, Космос, Креатор, Друзья и Юниор.',
 }
 
-export default async function HomePage() {
-  const payload = await getBrickPayload()
-
-  const [settings, categories, featured] = await Promise.all([
-    getSettings(),
-    getCategories(),
-    payload.find({
+/** Товары-хиты той же политикой, что `getSettings`/`getCategories`: сбой не роняет страницу. */
+async function getFeatured(): Promise<Product[]> {
+  try {
+    const payload = await getBrickPayload()
+    const { docs } = await payload.find({
       collection: 'products',
       depth: 1,
       where: { featured: { equals: true } },
-      limit: 6,
-    }),
-  ])
+      limit: 8,
+    })
+    return docs
+  } catch (error) {
+    // Иначе `npm run build` падал сырым SQLITE_ERROR на пустой БД (N1)
+    console.error('[data] Не удалось получить товары для главной:', error)
+    return []
+  }
+}
 
-  // В блоке «Хиты недели» — только товары с признаком `featured`, без «добора» обычными.
-  // Если хитов меньше четырёх, блок честно показывает меньше карточек.
-  const products = featured.docs.slice(0, 8)
+export default async function HomePage() {
+  const [settings, categories, products] = await Promise.all([
+    getSettings(),
+    getCategories(),
+    getFeatured(),
+  ])
 
   return (
     <>

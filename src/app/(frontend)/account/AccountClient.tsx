@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { useFavorites } from '@/components/FavoritesProvider'
+import { ApiRequestError, useFavorites } from '@/components/FavoritesProvider'
 import { ProductCard } from '@/components/ProductCard'
 import type { SessionCustomer } from '@/lib/customer-session'
 import type { Product } from '@/payload-types'
@@ -28,6 +28,14 @@ export function AccountClient({ customer, children }: Props) {
   const [email, setEmail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  // Секунды до конца паузы после 429: пока > 0, форма не отправляется (BUG-04)
+  const [cooldown, setCooldown] = useState(0)
+
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setTimeout(() => setCooldown((left) => left - 1), 1000)
+    return () => clearTimeout(timer)
+  }, [cooldown])
 
   // `?login=1` из шапки открывает форму с фокусом на имени
   useEffect(() => {
@@ -38,6 +46,7 @@ export function AccountClient({ customer, children }: Props) {
 
   async function handleLogin(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (cooldown > 0) return
     setSubmitting(true)
     setFormError('')
     clearError()
@@ -47,6 +56,12 @@ export function AccountClient({ customer, children }: Props) {
       setEmail('')
     } catch (loginError) {
       setFormError(loginError instanceof Error ? loginError.message : 'Не удалось войти')
+      // 429 — сервер уже решает, когда пускать: держим кнопку неактивной,
+      // иначе пользователь бесконечно повторяет заведомо отклоняемую попытку.
+      if (loginError instanceof ApiRequestError && loginError.status === 429) {
+        const seconds = Number(loginError.message.match(/(\d+)\s*с/)?.[1] ?? 60)
+        setCooldown(Number.isFinite(seconds) && seconds > 0 ? seconds : 60)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -99,9 +114,23 @@ export function AccountClient({ customer, children }: Props) {
             </p>
           )}
 
-          <button type="submit" className="btn btn-red" disabled={submitting}>
-            {submitting ? 'Входим…' : 'Войти'}
+          <button
+            type="submit"
+            className="btn btn-red"
+            disabled={submitting || cooldown > 0}
+            aria-describedby={cooldown > 0 ? 'login-cooldown' : undefined}
+          >
+            {submitting
+              ? 'Входим…'
+              : cooldown > 0
+                ? `Повторить через ${cooldown} с`
+                : 'Войти'}
           </button>
+          {cooldown > 0 && (
+            <p id="login-cooldown" className="account-empty" aria-live="polite">
+              Слишком много попыток. Форма разблокируется автоматически.
+            </p>
+          )}
         </form>
       </div>
     )
@@ -144,6 +173,8 @@ function FavoritesGrid() {
   const { favorites, ready } = useFavorites()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
 
   const key = favorites.join(',')
 
@@ -155,10 +186,13 @@ function FavoritesGrid() {
       setLoading(true)
       if (favorites.length === 0) {
         setProducts([])
+        setTotal(0)
+        setHasMore(false)
         setLoading(false)
         return
       }
 
+      // Сервер отдаёт список пачками; `hasMore` показывает, что показана не вся выборка.
       const response = await fetch('/api/account/favorites?format=full', { cache: 'no-store' })
       if (!response.ok) {
         if (alive) {
@@ -168,10 +202,16 @@ function FavoritesGrid() {
         return
       }
 
-      const body = (await response.json()) as { products?: Product[] }
+      const body = (await response.json()) as {
+        products?: Product[]
+        totalDocs?: number
+        hasMore?: boolean
+      }
       if (!alive) return
 
       setProducts(Array.isArray(body.products) ? body.products : [])
+      setTotal(typeof body.totalDocs === 'number' ? body.totalDocs : favorites.length)
+      setHasMore(Boolean(body.hasMore))
       setLoading(false)
     })()
 
@@ -193,10 +233,18 @@ function FavoritesGrid() {
   }
 
   return (
-    <div className="product-grid">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} headingLevel={2} />
-      ))}
-    </div>
+    <>
+      <div className="product-grid">
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} headingLevel={2} />
+        ))}
+      </div>
+      {hasMore && (
+        <p className="account-empty" role="status">
+          Показаны последние {products.length} из {total} наборов. Остальные появятся
+          в списке по мере удаления.
+        </p>
+      )}
+    </>
   )
 }

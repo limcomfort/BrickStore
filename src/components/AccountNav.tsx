@@ -26,6 +26,11 @@ export function AccountNav() {
         </span>
       </Link>
 
+      {/*
+        Покупатель приходит из серверной разметки, поэтому ветку решаем по нему,
+        а не по `ready`: иначе до окончания загрузки избранного вошедший видел
+        на первом кадре кнопку «Войти» (BUG-07).
+      */}
       {customer ? (
         <Link className="account-name" href="/account">
           {customer.name}

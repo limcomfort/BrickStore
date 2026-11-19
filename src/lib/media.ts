@@ -1,11 +1,14 @@
 import type { Media } from '@/payload-types'
 
+/** Создаётся один раз на модуль: конструктор заметно дороже самого `format`. */
+const PRICE_FORMAT = new Intl.NumberFormat('ru-RU', {
+  style: 'currency',
+  currency: 'RUB',
+  maximumFractionDigits: 0,
+})
+
 export function formatPrice(value: number): string {
-  return new Intl.NumberFormat('ru-RU', {
-    style: 'currency',
-    currency: 'RUB',
-    maximumFractionDigits: 0,
-  }).format(value)
+  return PRICE_FORMAT.format(value)
 }
 
 export function isMediaPopulated(image: unknown): image is Media {
@@ -16,7 +19,8 @@ export function isMediaPopulated(image: unknown): image is Media {
 
 /** Из строки телефона делает значение для href: `tel:` — только цифры и ведущий «+». */
 export function toTelHref(phone: string): string {
-  return `tel:${phone.replace(/[^+\d]/g, '')}`
+  const digits = phone.replace(/[^\d]/g, '')
+  return digits ? `tel:+${digits}` : ''
 }
 
 export function discountPercent(price: number, oldPrice?: number | null): number | null {

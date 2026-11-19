@@ -2,16 +2,22 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { cache } from 'react'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { getBrickPayload, getSettings } from '@/lib/data'
 import { formatPrice, discountPercent, hasDiscount, isMediaPopulated, toTelHref } from '@/lib/media'
 import { AskQuestion } from '@/components/AskQuestion'
+import { FavoriteButton } from '@/components/FavoriteButton'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category, Media, Product } from '@/payload-types'
 
 type Params = Promise<{ slug: string }>
 
-async function findProduct(slug: string): Promise<Product | null> {
+/**
+ * `cache()` дедуплицирует запрос в рамках одного рендера: метаданные
+ * и страница просят один и тот же товар, второго обращения к БД нет.
+ */
+const findProduct = cache(async (slug: string): Promise<Product | null> => {
   const payload = await getBrickPayload()
   const { docs } = await payload.find({
     collection: 'products',
@@ -20,7 +26,7 @@ async function findProduct(slug: string): Promise<Product | null> {
     limit: 1,
   })
   return docs[0] ?? null
-}
+})
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { slug } = await params
@@ -52,7 +58,8 @@ export default async function ProductPage({ params }: { params: Params }) {
     collection: 'products',
     depth: 1,
     where: {
-      category: { equals: category?.id },
+      // Без категории фильтр по `undefined` вернул бы весь каталог
+      ...(category ? { category: { equals: category.id } } : {}),
       id: { not_equals: product.id },
     },
     limit: 3,
@@ -143,6 +150,7 @@ export default async function ProductPage({ params }: { params: Params }) {
                 </Link>
               )}
               <AskQuestion productId={product.id} productTitle={product.title} />
+              <FavoriteButton productId={product.id} productTitle={product.title} />
             </div>
 
             <ul className="buy-notes">

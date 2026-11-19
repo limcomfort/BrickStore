@@ -379,16 +379,33 @@ async function seedEverything(payload: Payload): Promise<void> {
 
   // 1. Админ
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@brickstore.dev'
+  const adminPassword = process.env.ADMIN_PASSWORD || 'BrickStore2026!'
   const existingUsers = await payload.find({ collection: 'users', limit: 1 })
   if (existingUsers.totalDocs === 0) {
     await payload.create({
       collection: 'users',
-      data: {
-        email: adminEmail,
-        password: process.env.ADMIN_PASSWORD || 'BrickStore2026!',
-      },
+      data: { email: adminEmail, password: adminPassword },
     })
     console.log(`Created admin user: ${adminEmail}`)
+  } else {
+    // Сид идемпотентен: иначе смена ADMIN_EMAIL/ADMIN_PASSWORD в .env
+    // не применялась и в базе оставался старый пароль (N3).
+    const admin = existingUsers.docs[0]
+    const patch: { email?: string; password?: string } = {}
+    if (admin.email !== adminEmail) patch.email = adminEmail
+    if (process.env.ADMIN_PASSWORD) patch.password = adminPassword
+
+    if (Object.keys(patch).length > 0) {
+      await payload.update({
+        collection: 'users',
+        id: admin.id,
+        data: patch,
+        overrideAccess: true,
+      })
+      console.log(`Updated admin user: ${adminEmail}`)
+    } else {
+      console.log(`Admin user already exists: ${admin.email} (пароль не менялся, задайте ADMIN_PASSWORD)`)
+    }
   }
 
   // 2. Настройки сайта
@@ -421,24 +438,28 @@ async function seedEverything(payload: Payload): Promise<void> {
       Buffer.from(brickSVG(color, color2, mode), 'utf-8')
 
     const name = p.slug
+    // Размер файла передаём реальный: адаптер пишет его в поле `filesize`,
+    // и заглушка `size: 1` давала в админке «1 байт» вместо настоящего веса.
+    const heroData = draw(i % 3 === 2 ? 'stack' : 'single', p.color, p.color2)
     const hero = await payload.create({
       collection: 'media',
       data: { alt: `${p.title} — главное изображение` },
       file: {
-        data: draw(i % 3 === 2 ? 'stack' : 'single', p.color, p.color2),
+        data: heroData,
         mimetype: 'image/svg+xml',
         name: `${name}-hero.svg`,
-        size: 1,
+        size: heroData.length,
       },
     })
+    const altData = draw('stack', p.color2 ?? p.color, p.color)
     const alt = await payload.create({
       collection: 'media',
       data: { alt: `${p.title} — вид сверху` },
       file: {
-        data: draw('stack', p.color2 ?? p.color, p.color),
+        data: altData,
         mimetype: 'image/svg+xml',
         name: `${name}-top.svg`,
-        size: 1,
+        size: altData.length,
       },
     })
 

@@ -7,11 +7,32 @@ import { matchesQuery } from '@/lib/search'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category } from '@/payload-types'
 
+/** Next.js отдаёт повторяющийся параметр массивом: `/catalog?q=лего&q=город`. */
+type Param = string | string[] | undefined
+
 type SearchParams = {
-  category?: string
-  sort?: string
-  q?: string
-  page?: string
+  category?: Param
+  sort?: Param
+  q?: Param
+  page?: Param
+}
+
+/** Первое значение параметра — повторяющиеся ключи не ломают типы и запрос. */
+function first(value: Param): string | undefined {
+  if (Array.isArray(value)) return value[0]
+  return value
+}
+
+/** Нормализованные параметры: массивы сведены к строке. */
+type FlatParams = { category?: string; sort?: string; q?: string; page?: string }
+
+function flatten(params: SearchParams): FlatParams {
+  return {
+    category: first(params.category),
+    sort: first(params.sort),
+    q: first(params.q),
+    page: first(params.page),
+  }
 }
 
 const SORTS: { value: string; label: string }[] = [
@@ -26,7 +47,7 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<SearchParams>
 }): Promise<Metadata> {
-  const params = await searchParams
+  const params = flatten(await searchParams)
   const query = params.q?.trim()
   const categories = await getCategories()
   const category = categories.find((c: Category) => c.slug === params.category)
@@ -52,7 +73,7 @@ export async function generateMetadata({
   }
 }
 
-function buildUrl(params: SearchParams, patch: Partial<SearchParams>): string {
+function buildUrl(params: FlatParams, patch: Partial<FlatParams>): string {
   const search = new URLSearchParams()
   const merged = { ...params, ...patch }
   for (const [key, value] of Object.entries(merged)) {
@@ -63,7 +84,7 @@ function buildUrl(params: SearchParams, patch: Partial<SearchParams>): string {
 }
 
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const params = await searchParams
+  const params = flatten(await searchParams)
   const payload = await getBrickPayload()
   const categories = await getCategories()
 
