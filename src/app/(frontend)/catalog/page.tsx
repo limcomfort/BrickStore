@@ -5,7 +5,7 @@ import type { Where } from 'payload'
 import { getBrickPayload, getCategories } from '@/lib/data'
 import { matchesQuery } from '@/lib/search'
 import { ProductCard } from '@/components/ProductCard'
-import type { Category } from '@/payload-types'
+import type { Category, Product } from '@/payload-types'
 
 /** Next.js отдаёт повторяющийся параметр массивом: `/catalog?q=лего&q=город`. */
 type Param = string | string[] | undefined
@@ -83,9 +83,38 @@ function buildUrl(params: FlatParams, patch: Partial<FlatParams>): string {
   return `/catalog${qs ? `?${qs}` : ''}`
 }
 
+/** Товары каталога. Сбой БД не роняет страницу: она покажет пустую выдачу с логом. */
+async function findProducts(args: {
+  where: Where
+  sort: string
+  limit: number
+  page: number
+}): Promise<{ docs: Product[]; totalDocs: number; totalPages: number; currentPage: number }> {
+  try {
+    const payload = await getBrickPayload()
+    const result = await payload.find({
+      collection: 'products',
+      depth: 1,
+      where: args.where,
+      sort: args.sort,
+      limit: args.limit,
+      page: args.page,
+    })
+    return {
+      docs: result.docs,
+      totalDocs: result.totalDocs,
+      totalPages: result.totalPages,
+      currentPage: result.page ?? 1,
+    }
+  } catch (error) {
+    // Раньше здесь падала и сборка, и страница сырым SQLITE_ERROR (N1)
+    console.error('[catalog] Не удалось получить товары:', error)
+    return { docs: [], totalDocs: 0, totalPages: 0, currentPage: 1 }
+  }
+}
+
 export default async function CatalogPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = flatten(await searchParams)
-  const payload = await getBrickPayload()
   const categories = await getCategories()
 
   const activeCategory = params.category
@@ -110,9 +139,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Prom
   const where: Where = {}
   if (activeCategory) where.category = { equals: activeCategory.id }
 
-  const { docs, totalDocs, totalPages, page: currentPage = 1 } = await payload.find({
-    collection: 'products',
-    depth: 1,
+  const { docs, totalDocs, totalPages, currentPage } = await findProducts({
     where,
     sort,
     limit: hasQuery ? 200 : 9,

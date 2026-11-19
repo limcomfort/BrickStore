@@ -1,6 +1,7 @@
 import 'dotenv/config'
 
 import { getPayload, type Payload } from 'payload'
+import sharp from 'sharp'
 
 import config from './payload.config'
 
@@ -365,16 +366,18 @@ async function run(): Promise<void> {
 }
 
 async function seedEverything(payload: Payload): Promise<void> {
-  // Очистка
-  for (const slug of ['products', 'categories', 'media'] as const) {
-    const { docs } = await payload.find({
+  /**
+   * Очистка в порядке зависимостей: `inquiries` ссылается на товар
+   * с `NOT NULL`, поэтому удаление товара первым падало
+   * `SQLITE_CONSTRAINT_NOTNULL: inquiries.product_id`.
+   * Избранное, в свою очередь, ссылается и на товар, и на покупателя.
+   */
+  for (const slug of ['inquiries', 'favorites', 'products', 'categories', 'media'] as const) {
+    await payload.delete({
       collection: slug,
-      limit: 1000,
-      depth: 0,
+      where: { id: { exists: true } },
+      overrideAccess: true,
     })
-    for (const doc of docs) {
-      await payload.delete({ collection: slug, id: doc.id })
-    }
   }
 
   // 1. Админ
@@ -434,31 +437,36 @@ async function seedEverything(payload: Payload): Promise<void> {
 
   // 4. Товары + иллюстрации
   for (const [i, p] of products.entries()) {
-    const draw = (mode: 'single' | 'stack', color: string, color2?: string) =>
-      Buffer.from(brickSVG(color, color2, mode), 'utf-8')
+    /**
+     * Иллюстрации генерируем в SVG (так проще рисовать), но в CMS кладём PNG:
+     * SVG в оптимизаторе Next отключён из-за риска XSS (issue #5),
+     * а растровые форматы сжимаются и режутся на размеры нормально.
+     */
+    const draw = async (mode: 'single' | 'stack', color: string, color2?: string) =>
+      sharp(Buffer.from(brickSVG(color, color2, mode), 'utf-8'))
+        .png({ compressionLevel: 9 })
+        .toBuffer()
 
     const name = p.slug
-    // Размер файла передаём реальный: адаптер пишет его в поле `filesize`,
-    // и заглушка `size: 1` давала в админке «1 байт» вместо настоящего веса.
-    const heroData = draw(i % 3 === 2 ? 'stack' : 'single', p.color, p.color2)
+    const heroData = await draw(i % 3 === 2 ? 'stack' : 'single', p.color, p.color2)
     const hero = await payload.create({
       collection: 'media',
       data: { alt: `${p.title} — главное изображение` },
       file: {
         data: heroData,
-        mimetype: 'image/svg+xml',
-        name: `${name}-hero.svg`,
+        mimetype: 'image/png',
+        name: `${name}-hero.png`,
         size: heroData.length,
       },
     })
-    const altData = draw('stack', p.color2 ?? p.color, p.color)
+    const altData = await draw('stack', p.color2 ?? p.color, p.color)
     const alt = await payload.create({
       collection: 'media',
       data: { alt: `${p.title} — вид сверху` },
       file: {
         data: altData,
-        mimetype: 'image/svg+xml',
-        name: `${name}-top.svg`,
+        mimetype: 'image/png',
+        name: `${name}-top.png`,
         size: altData.length,
       },
     })

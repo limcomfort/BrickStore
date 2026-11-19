@@ -18,14 +18,20 @@ type Params = Promise<{ slug: string }>
  * и страница просят один и тот же товар, второго обращения к БД нет.
  */
 const findProduct = cache(async (slug: string): Promise<Product | null> => {
-  const payload = await getBrickPayload()
-  const { docs } = await payload.find({
-    collection: 'products',
-    depth: 1,
-    where: { slug: { equals: slug } },
-    limit: 1,
-  })
-  return docs[0] ?? null
+  try {
+    const payload = await getBrickPayload()
+    const { docs } = await payload.find({
+      collection: 'products',
+      depth: 1,
+      where: { slug: { equals: slug } },
+      limit: 1,
+    })
+    return docs[0] ?? null
+  } catch (error) {
+    // Битые данные или пустая БД — это «товар не найден», а не 500 (N1)
+    console.error(`[product] Не удалось получить «${slug}»:`, error)
+    return null
+  }
 })
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
@@ -54,16 +60,22 @@ export default async function ProductPage({ params }: { params: Params }) {
     .filter(isMediaPopulated)
     .filter((image) => image.id !== heroId)
 
-  const related = await payload.find({
-    collection: 'products',
-    depth: 1,
-    where: {
-      // Без категории фильтр по `undefined` вернул бы весь каталог
-      ...(category ? { category: { equals: category.id } } : {}),
-      id: { not_equals: product.id },
-    },
-    limit: 3,
-  })
+  const related = await payload
+    .find({
+      collection: 'products',
+      depth: 1,
+      where: {
+        // Без категории фильтр по `undefined` вернул бы весь каталог
+        ...(category ? { category: { equals: category.id } } : {}),
+        id: { not_equals: product.id },
+      },
+      limit: 3,
+    })
+    .catch((error) => {
+      // Блок «Похожие» не критичен: без него страница остаётся рабочей
+      console.error('[product] Не удалось получить похожие товары:', error)
+      return { docs: [] as Product[] }
+    })
 
   const discount = discountPercent(product.price, product.oldPrice)
   const telHref = toTelHref(settings?.contactPhone || '')
