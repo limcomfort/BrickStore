@@ -25,10 +25,6 @@ export function createSessionToken(): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
-/** Кэш покупателя на время одного вызова: layout и хук заявки читают сессию повторно. */
-type SessionCache = WeakMap<object, SessionCustomer | null>
-const readCache: SessionCache = new WeakMap()
-
 /**
  * Токен из заголовка `Authorization: Bearer <token>`.
  * Нужен мобильному клиенту, который не умеет работать с httpOnly-cookie.
@@ -43,19 +39,18 @@ export function getTokenFromRequest(request: { headers?: Headers | null }): stri
 /**
  * Находит покупателя по токену из cookie.
  * Возвращает null для гостя, истёкшей сессии и неизвестного токена.
- * В рамках одного запроса результат мемоизируется по объекту `payload`.
+ *
+ * Кэша здесь СОЗНАТЕЛЬНО нет. Раньше результат мемоизировался в `WeakMap`
+ * по объекту `payload`, а Payload создаётся один раз на процесс — поэтому
+ * в кэш навсегда попадал покупатель первого вошедшего, и следующий
+ * посетитель видел ЧУЖОЙ аккаунт. Лишний запрос в БД дешевле такой утечки.
  */
 export async function getSessionCustomer(payload: Payload): Promise<SessionCustomer | null> {
   const store = await cookies()
   const token = store.get(SESSION_COOKIE)?.value
   if (!token) return null
 
-  const cacheKey = payload as object
-  if (readCache.has(cacheKey)) return readCache.get(cacheKey) ?? null
-
-  const customer = await getCustomerByToken(payload, token)
-  readCache.set(cacheKey, customer)
-  return customer
+  return getCustomerByToken(payload, token)
 }
 
 /**

@@ -14,18 +14,26 @@ const dirname = path.dirname(__filename)
  * закрывают встраивание сайта и плагинов.
  * `X-Content-Type-Options: nosniff` не даёт браузеру «додумать» тип
  * ответа — это основная защита от отдачи файла как HTML/скрипта.
+ *
+ * `'unsafe-eval'` добавляется только в dev: React применяет `eval` для
+ * восстановления стектрейсов при разработке (без него в консоли ошибка).
+ * В production его нет — политика остаётся строгой.
  */
+const DEV = process.env.NODE_ENV !== 'production'
+
 const SECURITY_HEADERS = [
   {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      // Next.js вставляет инлайновые скрипты гидратации и RSC-пейлоад
-      "script-src 'self' 'unsafe-inline'",
+      // Next.js вставляет инлайновые скрипты гидратации и RSC-пейлоад.
+      // `unsafe-eval` нужен только сборке разработчика.
+      `script-src 'self' 'unsafe-inline'${DEV ? " 'unsafe-eval'" : ''}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self'",
+      // WebSocket нужен для Fast Refresh в dev, в production остаётся только 'self'
+      DEV ? "connect-src 'self' ws: http://localhost:*" : "connect-src 'self'",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",

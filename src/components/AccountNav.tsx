@@ -8,8 +8,8 @@ import { useFavorites } from '@/components/FavoritesProvider'
  * Отдельный клиентский компонент, чтобы `Header` остался серверным.
  */
 export function AccountNav() {
-  const { customer, favorites, ready } = useFavorites()
-  const count = favorites.length
+  const { customer, totalCount, ready } = useFavorites()
+  const count = totalCount
 
   return (
     <div className="account-nav">

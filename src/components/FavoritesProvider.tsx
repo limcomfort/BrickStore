@@ -8,6 +8,8 @@ export type SessionCustomer = { id: number; email: string; name: string }
 type FavoritesContextValue = {
   customer: SessionCustomer | null
   favorites: number[]
+  /** Полное число записей: `favorites` может быть длиннее или короче из-за пагинации */
+  totalCount: number
   /** Пока идёт первичная загрузка, счётчик не мигает с 0 на N */
   ready: boolean
   isFavorite: (productId: number) => boolean
@@ -62,20 +64,52 @@ export function FavoritesProvider({
 }) {
   const [customer, setCustomer] = useState<SessionCustomer | null>(initialCustomer)
   const [favorites, setFavorites] = useState<number[]>([])
+  /** Полное число записей в избранном: `favorites` может быть усечён пачкой. */
+  const [totalCount, setTotalCount] = useState(0)
   const [ready, setReady] = useState(false)
   const [pending, setPending] = useState<number | null>(null)
   const [error, setError] = useState('')
   const router = useRouter()
 
+  /**
+   * Грузим ВСЕ страницы: сервер отдаёт максимум 100 записей за запрос,
+   * и раньше счётчик в шапке упирался в 100, а лишнее избранное
+   * оставалось недоступным (BUG-09).
+   */
   const loadFavorites = useCallback(async () => {
-    const response = await fetch('/api/account/favorites', { cache: 'no-store' })
-    if (!response.ok) {
-      // 401 здесь штатный: гость не имеет избранного
-      setFavorites([])
-      return
+    const ids: number[] = []
+    let offset = 0
+    let total = 0
+
+    // Ограничение на число итераций — страховка от зацикливания
+    // при рассогласовании `hasMore` и `nextOffset` на сервере.
+    for (let guard = 0; guard < 100; guard += 1) {
+      const response = await fetch(`/api/account/favorites?offset=${offset}`, { cache: 'no-store' })
+      if (!response.ok) {
+        // 401 здесь штатный: гость не имеет избранного
+        if (guard === 0) {
+          setFavorites([])
+          setTotalCount(0)
+        }
+        return
+      }
+
+      const body = (await response.json()) as {
+        productIds?: number[]
+        totalDocs?: number
+        hasMore?: boolean
+        nextOffset?: number | null
+      }
+
+      if (Array.isArray(body.productIds)) ids.push(...body.productIds)
+      if (typeof body.totalDocs === 'number') total = body.totalDocs
+
+      if (!body.hasMore || typeof body.nextOffset !== 'number' || body.nextOffset <= offset) break
+      offset = body.nextOffset
     }
-    const body = (await response.json()) as { productIds?: number[] }
-    setFavorites(Array.isArray(body.productIds) ? body.productIds : [])
+
+    setFavorites(ids)
+    setTotalCount(total > 0 ? total : ids.length)
   }, [])
 
   // Загружаем избранное после каждого входа и при первом монтировании
@@ -144,6 +178,7 @@ export function FavoritesProvider({
     await fetch('/api/account/session', { method: 'DELETE' })
     setCustomer(null)
     setFavorites([])
+    setTotalCount(0)
     // Тот же маршрут отрисован с заявками покупателя — перерисовываем гостем
     router.refresh()
   }, [router])
@@ -163,6 +198,7 @@ export function FavoritesProvider({
       setFavorites((current) =>
         wasFavorite ? current.filter((id) => id !== productId) : [...current, productId],
       )
+      setTotalCount((current) => Math.max(0, current + (wasFavorite ? -1 : 1)))
 
       try {
         const response = wasFavorite
@@ -176,6 +212,9 @@ export function FavoritesProvider({
         if (!response.ok) {
           throw new Error(await readError(response, 'Не удалось обновить избранное'))
         }
+        // Сервер мог ответить `alreadyExists` — тогда счётчик не менялся,
+        // но локальное состояние уже верное, синхронизируем число записей.
+        await loadFavorites()
       } catch (toggleError) {
         setFavorites((current) =>
           wasFavorite
@@ -184,19 +223,21 @@ export function FavoritesProvider({
               : [...current, productId]
             : current.filter((id) => id !== productId),
         )
+        setTotalCount((current) => Math.max(0, current + (wasFavorite ? 1 : -1)))
         setError(toggleError instanceof Error ? toggleError.message : 'Ошибка сети')
       } finally {
         setPending(null)
         notifyOtherTabs()
       }
     },
-    [customer, favorites],
+    [customer, favorites, loadFavorites],
   )
 
   const value = useMemo<FavoritesContextValue>(
     () => ({
       customer,
       favorites,
+      totalCount,
       ready,
       isFavorite,
       toggleFavorite,
@@ -206,7 +247,7 @@ export function FavoritesProvider({
       clearError: () => setError(''),
       pending,
     }),
-    [customer, favorites, ready, isFavorite, toggleFavorite, login, logout, error, pending],
+    [customer, favorites, totalCount, ready, isFavorite, toggleFavorite, login, logout, error, pending],
   )
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>

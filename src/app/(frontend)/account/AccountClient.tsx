@@ -168,13 +168,15 @@ export function AccountClient({ customer, children }: Props) {
   )
 }
 
-/** Сетка избранного: данные подтягиваются по id из общего контекста. */
+/** Сетка избранного: карточки подтягиваются по id из общего контекста. */
 function FavoritesGrid() {
-  const { favorites, ready } = useFavorites()
+  const { favorites, totalCount, ready } = useFavorites()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   const key = favorites.join(',')
 
@@ -188,12 +190,16 @@ function FavoritesGrid() {
         setProducts([])
         setTotal(0)
         setHasMore(false)
+        setOffset(0)
         setLoading(false)
         return
       }
 
-      // Сервер отдаёт список пачками; `hasMore` показывает, что показана не вся выборка.
-      const response = await fetch('/api/account/favorites?format=full', { cache: 'no-store' })
+      // Сервер отдаёт список пачками; `hasMore`/`nextOffset` позволяют догрузить
+      // остальные карточки кнопкой (BUG-09) — раньше список просто обрезался.
+      const response = await fetch('/api/account/favorites?format=full&offset=0', {
+        cache: 'no-store',
+      })
       if (!response.ok) {
         if (alive) {
           setProducts([])
@@ -206,12 +212,14 @@ function FavoritesGrid() {
         products?: Product[]
         totalDocs?: number
         hasMore?: boolean
+        nextOffset?: number | null
       }
       if (!alive) return
 
       setProducts(Array.isArray(body.products) ? body.products : [])
       setTotal(typeof body.totalDocs === 'number' ? body.totalDocs : favorites.length)
       setHasMore(Boolean(body.hasMore))
+      setOffset(typeof body.nextOffset === 'number' ? body.nextOffset : 0)
       setLoading(false)
     })()
 
@@ -220,6 +228,33 @@ function FavoritesGrid() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, ready])
+
+  async function loadMore() {
+    setLoadingMore(true)
+    try {
+      const response = await fetch(`/api/account/favorites?format=full&offset=${offset}`, {
+        cache: 'no-store',
+      })
+      if (!response.ok) return
+
+      const body = (await response.json()) as {
+        products?: Product[]
+        hasMore?: boolean
+        nextOffset?: number | null
+      }
+
+      const next = Array.isArray(body.products) ? body.products : []
+      // Товар мог исчезнуть из каталога — дубли по id не добавляем
+      setProducts((current) => {
+        const seen = new Set(current.map((product) => product.id))
+        return [...current, ...next.filter((product) => !seen.has(product.id))]
+      })
+      setHasMore(Boolean(body.hasMore))
+      setOffset(typeof body.nextOffset === 'number' ? body.nextOffset : offset)
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
   if (!ready || loading) return <p className="account-empty">Загружаем избранное…</p>
 
@@ -239,11 +274,28 @@ function FavoritesGrid() {
           <ProductCard key={product.id} product={product} headingLevel={2} />
         ))}
       </div>
-      {hasMore && (
-        <p className="account-empty" role="status">
-          Показаны последние {products.length} из {total} наборов. Остальные появятся
-          в списке по мере удаления.
-        </p>
+      {hasMore ? (
+        <div className="account-more">
+          {/* Список не обрезан молча: показываем, сколько загружено из totalCount */}
+          <p className="account-empty" role="status">
+            Показаны {products.length} из {total} наборов.
+          </p>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={loadMore}
+            disabled={loadingMore}
+            aria-busy={loadingMore}
+          >
+            {loadingMore ? 'Загружаем…' : 'Показать ещё'}
+          </button>
+        </div>
+      ) : (
+        total > products.length && (
+          <p className="account-empty" role="status">
+            Показаны {products.length} из {totalCount} наборов.
+          </p>
+        )
       )}
     </>
   )

@@ -55,12 +55,16 @@ export async function GET(request: Request) {
     .filter((row): row is { product: Product; productId: number } => row.productId !== null)
 
   const productIds = rows.map((row) => row.productId)
-  // Клиент видит, что список усечён, и может догрузить остальное (BUG-09).
+  // Клиент видит, что список усечён, и догружает остальное (BUG-09).
+  //
+  // Смещение считаем по документам, которые вернула база, а не по `rows`:
+  // отфильтрованные записи с удалённым товаром иначе сдвигали бы окно
+  // и одни и те же карточки приезжали бы повторно.
   const pagination = {
     totalDocs: found.totalDocs,
     totalPages: found.totalPages,
     hasMore: found.hasNextPage,
-    nextOffset: found.hasNextPage ? offset + rows.length : null,
+    nextOffset: found.hasNextPage ? offset + found.docs.length : null,
   }
 
   if (!full) return json({ productIds, ...pagination })
