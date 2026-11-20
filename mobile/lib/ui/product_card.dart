@@ -106,6 +106,26 @@ class ProductCard extends StatelessWidget {
               ),
             ),
           ),
+        if (!product.inStock)
+          Positioned(
+            top: 10,
+            right: 10,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xCC17161C),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Под заказ',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

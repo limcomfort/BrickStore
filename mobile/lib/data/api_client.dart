@@ -44,23 +44,69 @@ class ApiClient {
     };
   }
 
-  /// Каталог товаров. [categoryId] ограничивает выборку одной категорией.
-  Future<List<Product>> fetchProducts({int? categoryId, String? search}) async {
+  /// Каталог товаров. [categoryId] ограничивает выборку одной категорией,
+  /// [search] фильтрует по названию — как строка поиска в веб-версии.
+  Future<List<Product>> fetchProducts({
+    int? categoryId,
+    String? search,
+    String sort = '-featured',
+  }) async {
     final where = <String, dynamic>{};
     if (categoryId != null) where['category'] = {'equals': categoryId};
-    if (search != null && search.trim().isNotEmpty) {
-      where['title'] = {'like': search.trim()};
-    }
 
     final query = <String, String>{
       'depth': '1',
       'limit': '100',
-      'sort': '-featured',
+      'sort': sort,
       if (where.isNotEmpty) 'where': jsonEncode(where),
     };
 
     final body = await _get('/api/products', query);
+    var products = _docs(body).map(Product.fromJson).toList(growable: false);
+
+    // `like` в SQLite регистрозависим для кириллицы и не ищет по подстроке,
+    // поэтому поиск, как и в веб-версии, выполняется на клиенте.
+    final needle = search?.trim().toLowerCase();
+    if (needle != null && needle.isNotEmpty) {
+      products = products
+          .where((product) =>
+              product.title.toLowerCase().contains(needle) ||
+              (product.summary?.toLowerCase().contains(needle) ?? false) ||
+              (product.categoryTitle?.toLowerCase().contains(needle) ?? false))
+          .toList(growable: false);
+    }
+
+    return products;
+  }
+
+  /// Витрина главной: товары со флагом «хит».
+  Future<List<Product>> fetchFeatured() async {
+    final body = await _get('/api/products', {
+      'depth': '1',
+      'limit': '8',
+      'where': jsonEncode({
+        'featured': {'equals': true},
+      }),
+    });
     return _docs(body).map(Product.fromJson).toList(growable: false);
+  }
+
+  /// Количество наборов в каждой категории.
+  ///
+  /// Payload не отдаёт агрегат в списке коллекции, а считать «в лоб» по каждому
+  /// фильтру — N+1 запросов. Поэтому один раз читаем id всех товаров и
+  /// группируем их на клиенте.
+  Future<Map<int, int>> fetchCategoryCounts() async {
+    final body = await _get('/api/products', {'depth': '0', 'limit': '1000'});
+    final counts = <int, int>{};
+    for (final doc in _docs(body)) {
+      final category = doc['category'];
+      final id = category is Map<String, dynamic> ? category['id'] : category;
+      if (id is num) {
+        counts[id.toInt()] = (counts[id.toInt()] ?? 0) + 1;
+      }
+    }
+    return counts;
   }
 
   /// Один товар по slug — так открывается карточка с экрана каталога.
@@ -163,6 +209,35 @@ class ApiClient {
     final response = await _http.delete(
       _uri('/api/account/favorites', {'productId': '$productId'}),
       headers: _headers(),
+    );
+    if (response.statusCode >= 400) {
+      throw _error(response, _decode(response));
+    }
+  }
+
+  /// Настройки сайта из глобального документа `settings`:
+  /// телефон, e-mail, текст баннера и заголовок витрины.
+  Future<Map<String, dynamic>> fetchSettings() async {
+    return _get('/api/globals/settings', null);
+  }
+
+  /// Заявка с формы «Заказать по телефону» / «Задать вопрос».
+  /// [message] должен быть не короче 10 символов — этого требует валидация CMS.
+  Future<void> sendInquiry({
+    required String name,
+    required String contact,
+    required String message,
+    required int productId,
+  }) async {
+    final response = await _http.post(
+      _uri('/api/inquiries'),
+      headers: _headers(json: true),
+      body: jsonEncode({
+        'name': name,
+        'contact': contact,
+        'message': message,
+        'product': productId,
+      }),
     );
     if (response.statusCode >= 400) {
       throw _error(response, _decode(response));

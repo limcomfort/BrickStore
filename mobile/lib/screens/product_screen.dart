@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../data/app_state.dart';
 import '../data/models.dart';
+import '../ui/inquiry_sheet.dart';
 import '../ui/remote_image.dart';
 import '../ui/theme.dart';
 
-/// Карточка набора: большое изображение, характеристики, цена, избранное.
+/// Карточка набора: галерея, характеристики, описание и действия —
+/// «Заказать по телефону», «Задать вопрос», избранное.
 class ProductScreen extends StatelessWidget {
   const ProductScreen({super.key, required this.product});
 
@@ -15,6 +17,10 @@ class ProductScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
     final favorite = state.isFavorite(product.id);
+    final images = <String>[
+      if (product.imageUrl != null) product.imageUrl!,
+      ...product.gallery.where((url) => url != product.imageUrl),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -23,39 +29,22 @@ class ProductScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
-          AspectRatio(
-            aspectRatio: 1.2,
-            child: Container(
-              color: const Color(0xFFF0EFF3),
-              child: product.imageUrl == null
-                  ? const Center(
-                      child: Icon(Icons.toys_outlined,
-                          size: 64, color: Color(0xFFB9B6C2)),
-                    )
-                  : RemoteImage(
-                      product.imageUrl!,
-                      fit: BoxFit.contain,
-                      placeholder: const Center(
-                        child: Icon(Icons.toys_outlined,
-                            size: 64, color: Color(0xFFB9B6C2)),
-                      ),
-                    ),
-            ),
-          ),
+          _gallery(images),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (product.article != null)
+                if (product.categoryTitle != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Text(
-                      'Артикул ${product.article}',
+                      product.categoryTitle!.toUpperCase(),
                       style: const TextStyle(
                         color: AppTheme.muted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.8,
                       ),
                     ),
                   ),
@@ -67,8 +56,26 @@ class ProductScreen extends StatelessWidget {
                     height: 1.2,
                   ),
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    if (product.article != null)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: Text(
+                          'Арт. ${product.article}',
+                          style: const TextStyle(
+                            color: AppTheme.muted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    _stockBadge(),
+                  ],
+                ),
                 if (product.summary != null) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   Text(
                     product.summary!,
                     style: const TextStyle(fontSize: 15, height: 1.45),
@@ -101,40 +108,125 @@ class ProductScreen extends StatelessWidget {
                     ],
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  product.inStock ? 'В наличии' : 'Нет в наличии',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: product.inStock
-                        ? const Color(0xFF0F6B2C)
-                        : AppTheme.accent,
-                  ),
-                ),
+                const SizedBox(height: 18),
+                _actions(context, state, favorite),
                 const SizedBox(height: 20),
                 _specs(),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: () async {
-                    try {
-                      await state.toggleFavorite(product.id);
-                    } catch (error) {
-                      if (context.mounted) showError(context, error);
-                    }
-                  },
-                  icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
-                  label: Text(
-                    favorite ? 'В избранном' : 'В избранное',
-                  ),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: favorite ? AppTheme.ink : AppTheme.accent,
-                  ),
-                ),
               ],
             ),
           ),
+          if (product.description != null) _description(product.description!),
         ],
       ),
+    );
+  }
+
+  Widget _gallery(List<String> images) {
+    if (images.isEmpty) {
+      return Container(
+        height: 280,
+        color: const Color(0xFFF0EFF3),
+        child: const Center(
+          child: Icon(Icons.toys_outlined, size: 64, color: Color(0xFFB9B6C2)),
+        ),
+      );
+    }
+
+    return Container(
+      height: 300,
+      color: const Color(0xFFF7F7F9),
+      child: PageView(
+        children: [
+          for (final url in images)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: RemoteImage(
+                url,
+                fit: BoxFit.contain,
+                placeholder: const Center(
+                  child: Icon(Icons.toys_outlined,
+                      size: 64, color: Color(0xFFB9B6C2)),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _stockBadge() {
+    final inStock = product.inStock;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: inStock ? const Color(0xFFE6F4EA) : const Color(0xFFF1F0F3),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        inStock ? '✓ В наличии' : 'Под заказ',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: inStock ? const Color(0xFF0F6B2C) : AppTheme.muted,
+        ),
+      ),
+    );
+  }
+
+  Widget _actions(BuildContext context, AppState state, bool favorite) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: () => showInquirySheet(
+                  context,
+                  mode: InquiryMode.phone,
+                  product: product,
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.accent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  'Заказать по телефону',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => showInquirySheet(
+                  context,
+                  mode: InquiryMode.question,
+                  product: product,
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text('Задать вопрос'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              try {
+                await state.toggleFavorite(product.id);
+              } catch (error) {
+                if (context.mounted) showError(context, error);
+              }
+            },
+            icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
+            label: Text(favorite ? 'В избранном' : 'В избранное'),
+          ),
+        ),
+      ],
     );
   }
 
@@ -142,6 +234,8 @@ class ProductScreen extends StatelessWidget {
     final rows = <(String, String)>[
       if (product.pieces != null) ('Деталей', '${product.pieces}'),
       if (product.ageMin != null) ('Возраст', '${product.ageMin}+'),
+      if (product.categoryTitle != null) ('Серия', product.categoryTitle!),
+      if (product.article != null) ('Артикул', product.article!),
     ];
     if (rows.isEmpty) return const SizedBox.shrink();
 
@@ -173,6 +267,23 @@ class ProductScreen extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _description(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Об этом наборе',
+            style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 10),
+          Text(text, style: const TextStyle(fontSize: 15, height: 1.5)),
         ],
       ),
     );

@@ -19,6 +19,9 @@ class Product {
     this.inStock = true,
     this.featured = false,
     this.imageUrl,
+    this.gallery = const [],
+    this.description,
+    this.categoryTitle,
   });
 
   final int id;
@@ -34,6 +37,15 @@ class Product {
   final bool featured;
   final String? imageUrl;
 
+  /// Дополнительные ракурсы из `gallery` — их показывает карточка товара.
+  final List<String> gallery;
+
+  /// Описание из richText, сведённое к простому тексту.
+  final String? description;
+
+  /// Название серии: в карточке веб-версии показывается над заголовком.
+  final String? categoryTitle;
+
   /// Есть ли скидка: старая цена задана и больше текущей.
   bool get hasDiscount => oldPrice != null && oldPrice! > price;
 
@@ -42,6 +54,9 @@ class Product {
       hasDiscount ? ((1 - price / oldPrice!) * 100).floor() : 0;
 
   factory Product.fromJson(Map<String, dynamic> json) {
+    final category = json['category'];
+    final gallery = json['gallery'];
+
     return Product(
       id: json['id'] as int,
       title: json['title'] as String? ?? 'Без названия',
@@ -55,6 +70,11 @@ class Product {
       inStock: json['inStock'] as bool? ?? true,
       featured: json['featured'] as bool? ?? false,
       imageUrl: _mediaUrl(json['heroImage']),
+      gallery: gallery is List
+          ? gallery.map(_mediaUrl).whereType<String>().toList(growable: false)
+          : const [],
+      description: _richText(json['description']),
+      categoryTitle: category is Map<String, dynamic> ? category['title'] as String? : null,
     );
   }
 }
@@ -163,4 +183,35 @@ String? _mediaUrl(Object? value) {
 
   if (url is int) return null;
   return url is String ? url : null;
+}
+
+/// Lexical хранит richText деревом. В мобильном клиенте достаточно плоского
+/// текста: собираем все `text`-узлы и склеиваем абзацы пустой строкой.
+String? _richText(Object? value) {
+  if (value is! Map<String, dynamic>) return null;
+  final root = value['root'];
+  if (root is! Map<String, dynamic>) return null;
+  final paragraphs = root['children'];
+  if (paragraphs is! List) return null;
+
+  final blocks = <String>[];
+  for (final block in paragraphs) {
+    if (block is! Map<String, dynamic>) continue;
+    final parts = <String>[];
+    _collectText(block, parts);
+    final text = parts.join(' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (text.isNotEmpty) blocks.add(text);
+  }
+  return blocks.isEmpty ? null : blocks.join('\n\n');
+}
+
+void _collectText(Object? node, List<String> out) {
+  if (node is! Map<String, dynamic>) return;
+  if (node['type'] == 'text' && node['text'] is String) out.add(node['text'] as String);
+  final children = node['children'];
+  if (children is List) {
+    for (final child in children) {
+      _collectText(child, out);
+    }
+  }
 }

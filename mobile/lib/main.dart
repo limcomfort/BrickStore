@@ -5,6 +5,7 @@ import 'data/api_client.dart';
 import 'data/app_state.dart';
 import 'screens/catalog_screen.dart';
 import 'screens/favorites_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'ui/theme.dart';
 
@@ -77,21 +78,35 @@ class _HomeTabs extends StatefulWidget {
 
 class _HomeTabsState extends State<_HomeTabs> {
   int _index = 0;
+  int? _catalogCategory;
+
+  void _openCatalog(int? categoryId) {
+    setState(() {
+      _catalogCategory = categoryId;
+      _index = 1;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(
         index: _index,
-        children: const [
-          CatalogScreen(),
-          FavoritesScreen(),
+        children: [
+          HomeScreen(onOpenCatalog: _openCatalog),
+          CatalogScreen(initialCategoryId: _catalogCategory),
+          const FavoritesScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Главная',
+          ),
           NavigationDestination(
             icon: Icon(Icons.grid_view_outlined),
             selectedIcon: Icon(Icons.grid_view),

@@ -5,9 +5,12 @@ import '../data/models.dart';
 import '../ui/product_card.dart';
 import '../ui/theme.dart';
 
-/// Каталог: категории-фильтры сверху, сетка товаров из CMS.
+/// Каталог: поиск, категории-фильтры, сортировка и сетка товаров из CMS.
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key});
+  const CatalogScreen({super.key, this.initialCategoryId});
+
+  /// Категория, выбранная на главной до перехода в каталог.
+  final int? initialCategoryId;
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -16,14 +19,41 @@ class CatalogScreen extends StatefulWidget {
 class _CatalogScreenState extends State<CatalogScreen> {
   List<Category> _categories = const [];
   List<Product> _products = const [];
-  int? _selectedCategory;
+  late int? _selectedCategory = widget.initialCategoryId;
+  String _search = '';
+  String _sort = '-featured';
   bool _loading = true;
   Object? _error;
+  final TextEditingController _searchController = TextEditingController();
+
+  /// Варианты сортировки — те же, что в веб-версии (`SORTS`).
+  static const _sorts = <(String, String)>[
+    ('-featured', 'По популярности'),
+    ('price', 'Сначала дешевле'),
+    ('-price', 'Сначала дороже'),
+    ('-createdAt', 'Новинки'),
+  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void didUpdateWidget(CatalogScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Пользователь выбрал категорию на главной — подхватываем его выбор.
+    if (widget.initialCategoryId != oldWidget.initialCategoryId) {
+      _selectedCategory = widget.initialCategoryId;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -36,7 +66,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
     try {
       final results = await Future.wait([
         api.fetchCategories(),
-        api.fetchProducts(categoryId: _selectedCategory),
+        api.fetchProducts(
+          categoryId: _selectedCategory,
+          search: _search,
+          sort: _sort,
+        ),
       ]);
       if (!mounted) return;
       setState(() {
@@ -55,6 +89,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   Future<void> _selectCategory(int? id) async {
     setState(() => _selectedCategory = id);
+    await _load();
+  }
+
+  Future<void> _submitSearch(String value) async {
+    setState(() => _search = value);
+    await _load();
+  }
+
+  Future<void> _selectSort(String value) async {
+    setState(() => _sort = value);
     await _load();
   }
 
@@ -91,7 +135,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
         onRefresh: _load,
         child: CustomScrollView(
           slivers: [
+            SliverToBoxAdapter(child: _searchBar()),
             SliverToBoxAdapter(child: _categoryBar()),
+            SliverToBoxAdapter(child: _sortRow()),
             if (_loading)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -103,13 +149,32 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 child: _ErrorView(error: _error!, onRetry: _load),
               )
             else if (_products.isEmpty)
-              const SliverFillRemaining(
+              SliverFillRemaining(
                 hasScrollBody: false,
-                child: Center(child: Text('В этой категории пока нет наборов')),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _search.isNotEmpty
+                          ? 'По запросу «$_search» ничего не нашлось'
+                          : 'В этой категории пока нет наборов',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
               )
-            else
+            else ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Text(
+                    'Найдено: ${_products.length}',
+                    style: const TextStyle(color: AppTheme.muted, fontSize: 12.5),
+                  ),
+                ),
+              ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 sliver: SliverGrid(
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 260,
@@ -123,8 +188,80 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _searchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: _submitSearch,
+        decoration: InputDecoration(
+          hintText: 'Найти набор…',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchController.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Очистить',
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    _searchController.clear();
+                    _submitSearch('');
+                  },
+                ),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: Color(0xFFD8D6DD)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sortRow() {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        itemCount: _sorts.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return const Center(
+              child: Text(
+                'Сортировка:',
+                style: TextStyle(color: AppTheme.muted, fontSize: 12.5),
+              ),
+            );
+          }
+          final (value, label) = _sorts[index - 1];
+          final active = _sort == value;
+          return TextButton(
+            onPressed: () => _selectSort(value),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              foregroundColor: active ? AppTheme.accent : AppTheme.muted,
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
