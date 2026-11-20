@@ -8,6 +8,7 @@ import { getBrickPayload, getSettings } from '@/lib/data'
 import { formatPrice, discountPercent, hasDiscount, isMediaPopulated, toTelHref } from '@/lib/media'
 import { AskQuestion } from '@/components/AskQuestion'
 import { FavoriteButton } from '@/components/FavoriteButton'
+import { OrderByPhone } from '@/components/OrderByPhone'
 import { ProductCard } from '@/components/ProductCard'
 import type { Category, Media, Product } from '@/payload-types'
 
@@ -152,10 +153,13 @@ export default async function ProductPage({ params }: { params: Params }) {
             </div>
 
             <div className="buy-actions">
-              {settings?.contactPhone ? (
-                <a className="btn btn-red btn-lg" href={telHref}>
-                  Заказать по телефону
-                </a>
+              {settings?.contactPhone && telHref ? (
+                <OrderByPhone
+                  productId={product.id}
+                  productTitle={product.title}
+                  phone={settings.contactPhone}
+                  telHref={telHref}
+                />
               ) : (
                 <Link className="btn btn-red btn-lg" href="/catalog">
                   Перейти в каталог

@@ -26,7 +26,7 @@ function toId(value: number | { id: number } | null): number | null {
  * `format=full` возвращает готовые карточки товаров — кабинет рисует их без второго запроса.
  *
  * Список строится по `productId`, который берётся из самого relation-поля.
- * Раскрытие (`depth: 1`) используется только для карточек: раньше строка
+ * Раскрытие используется только для карточек: раньше строка
  * выбрасывалась целиком, если товар приходил числом, и избранное «пропадало».
  */
 export async function GET(request: Request) {
@@ -43,7 +43,10 @@ export async function GET(request: Request) {
     where: { customer: { equals: customer.id } },
     limit: FAVORITES_LIMIT,
     page: Math.floor(offset / FAVORITES_LIMIT) + 1,
-    depth: full ? 1 : 0,
+    // `depth: 2` — не опечатка: первый уровень раскрывает `favorites.product`,
+    // второй — `product.heroImage`. С `depth: 1` картинка приходила числом,
+    // и в кабинете карточка рисовалась без изображения.
+    depth: full ? 2 : 0,
     sort: '-createdAt',
     overrideAccess: true,
   })

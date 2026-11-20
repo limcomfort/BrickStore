@@ -1397,6 +1397,46 @@ section.section:last-of-type {
   color: var(--muted);
 }
 
+/* ------------------------------------------- Модалка «Заказать по телефону» */
+.order-phone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-sm);
+  background: rgba(23, 22, 28, 0.05);
+}
+
+.order-phone-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.order-phone-number {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--red-dark);
+  text-decoration: none;
+}
+
+.order-phone-number:hover {
+  text-decoration: underline;
+}
+
+.order-phone-hours {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.order-phone-or {
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 /* --------------------------------------------------------------- 404 */
 .not-found {
   display: flex;
