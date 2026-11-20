@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ApiRequestError, useFavorites } from '@/components/FavoritesProvider'
 import { ProductCard } from '@/components/ProductCard'
@@ -20,6 +21,7 @@ type Props = {
 export function AccountClient({ customer, children }: Props) {
   const { login, logout, error, clearError, favorites } = useFavorites()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const loginFormRef = useRef<HTMLFormElement>(null)
   const focusedOnce = useRef(false)
   const formTitleId = useId()
@@ -54,6 +56,11 @@ export function AccountClient({ customer, children }: Props) {
       await login(name, email)
       setName('')
       setEmail('')
+      // Серверная часть страницы собрана под гостя: заявки и заголовок
+      // кабинета пришли из RSC ещё до входа. `router.refresh()` из провайдера
+      // уходит раньше, чем браузер сохраняет Set-Cookie, и данные остаются
+      // гостевыми — поэтому повторяем обновление после ответа на вход.
+      router.refresh()
     } catch (loginError) {
       setFormError(loginError instanceof Error ? loginError.message : 'Не удалось войти')
       // 429 — сервер уже решает, когда пускать: держим кнопку неактивной,

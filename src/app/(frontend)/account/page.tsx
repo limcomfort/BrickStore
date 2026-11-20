@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { getPayload } from 'payload'
 import { getSessionCustomer } from '@/lib/customer-session'
+import type { SessionCustomer } from '@/lib/customer-session'
 import { AccountClient } from './AccountClient'
 
 export const dynamic = 'force-dynamic'
@@ -30,17 +31,44 @@ const STATUS_LABEL: Record<InquiryRow['status'], string> = {
 }
 
 /** Заявки текущего покупателя. Гость получает пустой список. */
-async function loadInquiries(customerId: number): Promise<InquiryRow[]> {
+async function loadInquiries(customer: SessionCustomer): Promise<InquiryRow[]> {
   const payload = await getPayload({ config })
 
+  // Заявки ищем не только по связи `customer`, но и по e-mail из поля `contact`:
+  // вопросы, заданные до входа или до исправления привязки в хуке, остались без
+  // `customer_id` и иначе никогда не появлялись в кабинете.
   const found = await payload.find({
     collection: 'inquiries',
-    where: { customer: { equals: customerId } },
+    where: {
+      or: [
+        { customer: { equals: customer.id } },
+        { contact: { equals: customer.email } },
+      ],
+    },
     limit: 20,
     depth: 1,
     sort: '-createdAt',
     overrideAccess: true,
   })
+
+  // Связь закрываем задним числом: следующая заявка уже не потеряется.
+  const orphans = found.docs.filter((doc) => !doc.customer).map((doc) => doc.id)
+  if (orphans.length > 0) {
+    await Promise.all(
+      orphans.map((id) =>
+        payload
+          .update({
+            collection: 'inquiries',
+            id,
+            data: { customer: customer.id },
+            overrideAccess: true,
+          })
+          .catch((error) => {
+            payload.logger.warn({ err: error, msg: `Не удалось привязать заявку ${id}` })
+          }),
+      ),
+    )
+  }
 
   return found.docs.map((doc) => {
     const product = typeof doc.product === 'object' ? doc.product : null
@@ -58,7 +86,7 @@ async function loadInquiries(customerId: number): Promise<InquiryRow[]> {
 export default async function AccountPage() {
   const payload = await getPayload({ config })
   const customer = await getSessionCustomer(payload)
-  const inquiries = customer ? await loadInquiries(customer.id) : []
+  const inquiries = customer ? await loadInquiries(customer) : []
 
   return (
     <div className="wrap account-page">
