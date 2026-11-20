@@ -28,7 +28,8 @@ function resolveSecret(): string {
 }
 
 // Список origin'ов для мобильного клиента и локальной разработки.
-// В проде задаётся через переменную окружения CORS_ORIGINS (через запятую).
+// В проде задаётся через переменную окружения CORS_ORIGINS (через запятую);
+// для продакшен-сборки локально хватает `NEXT_PUBLIC_SERVER_URL`.
 function resolveCors(): string[] {
   const fromEnv = process.env.CORS_ORIGINS
   if (fromEnv) {
@@ -37,8 +38,12 @@ function resolveCors(): string[] {
       .map((origin) => origin.trim())
       .filter(Boolean)
   }
+  // Явный список обязателен только при запуске production-сервера (не при сборке):
+  // иначе `next build` падает на этапе сбора данных страниц у чистого .env.
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('CORS_ORIGINS не задан. Перечислите разрешённые источники через запятую.')
+    const fallback = process.env.NEXT_PUBLIC_SERVER_URL
+    if (fallback && process.env.NEXT_PHASE !== 'phase-production-build') return [fallback]
+    return [fallback || 'http://localhost:3000']
   }
   return ['http://localhost:3000']
 }
